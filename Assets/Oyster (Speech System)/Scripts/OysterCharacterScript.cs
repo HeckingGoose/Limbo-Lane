@@ -26,6 +26,6 @@ public class OysterCharacterScript : MonoBehaviour
     }
     public void StartSpeech() // Calls the 'Speak' function within Oyster
     {
-        oyster.Speak(conversationIndex);
+        oyster.Speak(characterID, conversationIndex);
     }
 }
