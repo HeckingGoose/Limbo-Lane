@@ -1,0 +1,34 @@
+{
+  "Characters": [
+    {
+      "characterName": "Dawn",
+      "characterAltName": "Dawn",
+      "characterColour": "#A7C8E9"
+    },
+    {
+      "characterName": "Alex",
+      "characterAltName": "Alex",
+      "characterColour": "#D28A62"
+    },
+    {
+      "characterName": "Alyx",
+      "characterAltName": "Dreamweaver",
+      "characterColour": "#CA86D3"
+    },
+    {
+      "characterName": "Cass",
+      "characterAltName": "Cassidy",
+      "characterColour": "#595A5F"
+    },
+    {
+      "characterName": "Cass",
+      "characterAltName": "Cassandra",
+      "characterColour": "#595A5F"
+    },
+    {
+      "characterName": "Emily",
+      "characterAltName": "Emily",
+      "characterColour": "#A5AE89"
+    }
+  ]
+}
