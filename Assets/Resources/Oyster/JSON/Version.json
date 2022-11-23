@@ -1,9 +1,0 @@
-{
-  "name": "Oyster",
-  "version": "3.0.0",
-  "supportedCommands": [
-    "CreateBox",
-    "CreateTextBox",
-    "WriteLine"
-  ]
-}

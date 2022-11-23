@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Default Local Group
+  m_EditorClassIdentifier: 
+  m_GroupName: Default Local Group
+  m_Data:
+    m_SerializedData: []
+  m_GUID: 10c6d3ec6f85f5947905ca841ccd593d
+  m_SerializeEntries:
+  - m_GUID: 79256fa8226dad14890affeb8703dc07
+    m_Address: Assets/Oyster/JSON
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: a020dd89b90452a47b7106b7d198dc68
+    m_Address: Assets/Oyster/JSON/Version.json
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 47d45c51fa60fcd43a0131e8d321bacb
+    m_Address: Assets/Oyster/JSON/Characters.json
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: ae6e924c05f08bb41bceb4cdf36d222b
+    m_Address: Assets/Oyster/JSON/Conversations
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 364bd6826ba2c6145bc814977da738a8
+    m_Address: Assets/Oyster/JSON/Conversations/Character0-Conversations.json
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 61e57010f7958304d98f7fd5618c7f0c, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 61b246877087a5941be0189b548501e8, type: 2}
+    - {fileID: 11400000, guid: c07db5ea2881d55419ecb404bce797d4, type: 2}
