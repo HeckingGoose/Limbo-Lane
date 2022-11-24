@@ -39,16 +39,14 @@ public class Oyster : MonoBehaviour
             inConversation = true;
             AsyncOperationHandle<TextAsset> conversationDataHandle = Addressables.LoadAssetAsync<TextAsset>("Assets/Oyster/JSON/Conversations/Character" + _characterIndex.ToString() + "-Conversations.json");
             conversationDataHandle.Completed += ConversationHandle_Completed;
-            Debug.Log("AGHAHAH");
-            _characterIndex = characterIndex;
-            _conversationIndex = conversationIndex;
-            _currentLine = currentLine;
+            characterIndex = _characterIndex;
+            conversationIndex = _conversationIndex;
+            currentLine = _currentLine;
+            
         }
         else
         {
-            Debug.Log("AH?");
-            OysterConversation[] conversations = JsonUtility.FromJson<OysterConversation[]>(conversationData.text);
-            Debug.Log(conversations.Length); // Add a parent class to OysterConversation that stores OysterConversation, to match JSON hierarchy
+            Debug.Log("Script has reached the part where it does stuff");
         }
         
     }

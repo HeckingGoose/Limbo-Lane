@@ -5,7 +5,8 @@
     "supportedCommands": [
       "CreateBox",
       "CreateTextBox",
-      "WriteLine"
+      "WriteLine",
+      "AddCharacter"
     ]
   }
 }

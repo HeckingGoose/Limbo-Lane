@@ -1,29 +1,41 @@
 {
   "Conversations": [
     {
-      "Dawn-InitialGreeting": [
-        {
-          "conversationMembers": [
-            "0"
-          ],
-          "conversation": [
-            [ "CreateBox", "textBackground", "(500,300)", "(100,100)", "UI\\textbox.png" ],
-            [ "CreateTextBox", "textBox", "(500,300)", "(100,100)", "horizontalAlign=centre" ],
-            [ "WriteLine", "Hello :)", "textBox", "textColour=#000000" ]
-          ]
-        }
+      "title": "Dawn-Intro",
+      "oysterVersion": "3.0.0",
+      "commandArray": [
+        "",
+        "",
+        ""
       ],
-      "Dawn-InitialGreetingFollowUp": [
-        {
-          "conversationMembers": [
-            "0"
-          ],
-          "conversation": [
-            [ "CreateBox", "textBackground", "(500,300)", "(100,100)", "UI\\textbox.png" ],
-            [ "CreateTextBox", "textBox", "(500,300)", "(100,100)", "horizontalAlign=centre" ],
-            [ "WriteLine", "Hello again :)", "textBox", "textColour=#000000" ]
-          ]
-        }
+      "valueArray": [
+        "",
+        "",
+        ""
+      ],
+      "stringArray": [
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "title": "Dawn-AfterIntro",
+      "oysterVersion": "3.0.0",
+      "commandArray": [
+        "",
+        "",
+        ""
+      ],
+      "valueArray": [
+        "",
+        "",
+        ""
+      ],
+      "stringArray": [
+        "",
+        "",
+        ""
       ]
     }
   ]
