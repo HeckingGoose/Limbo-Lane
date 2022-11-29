@@ -1,42 +1,14 @@
 {
-  "Conversations": [
+  "container": [
     {
       "title": "Dawn-Intro",
-      "oysterVersion": "3.0.0",
-      "commandArray": [
-        "",
-        "",
-        ""
-      ],
-      "valueArray": [
-        "",
-        "",
-        ""
-      ],
-      "stringArray": [
-        "",
-        "",
-        ""
-      ]
+      "scriptVersion": "3.0.0",
+      "commands": [ "CommandName; parameter; parameter ; optionalParamater = value", "CommandName; parameter; parameter ; optionalParamater = value" ]
     },
     {
       "title": "Dawn-AfterIntro",
-      "oysterVersion": "3.0.0",
-      "commandArray": [
-        "",
-        "",
-        ""
-      ],
-      "valueArray": [
-        "",
-        "",
-        ""
-      ],
-      "stringArray": [
-        "",
-        "",
-        ""
-      ]
+      "scriptVersion": "3.0.0",
+      "commands": [ "CommandName; parameter; parameter ; optionalParamater = value", "CommandName; parameter; parameter ; optionalParamater = value" ]
     }
   ]
 }

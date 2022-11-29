@@ -13,6 +13,7 @@ public class Oyster : MonoBehaviour
     private TextMesh testText;
     #endregion
     public bool inConversation = false;
+    private string scriptVersion = "?";
 
     #region Conversation Variables
     private int characterIndex;
@@ -46,7 +47,12 @@ public class Oyster : MonoBehaviour
         }
         else
         {
-            Debug.Log("Script has reached the part where it does stuff");
+            OysterConversationsContainer conversations = JsonUtility.FromJson<OysterConversationsContainer>(conversationData.text);
+            OysterConversation currentConversation = conversations.container[_conversationIndex];
+            if (currentConversation.scriptVersion != scriptVersion)
+            {
+                Debug.Log("Script versions do not match! Some commands in this script may not be recognised.");
+            }
         }
         
     }
@@ -81,6 +87,7 @@ public class Oyster : MonoBehaviour
     private void DisplayVersionData(TextAsset versionDataAsset) // Displays the current version of Oyster to the Unity console
     {
         OysterVersion versionData = JsonUtility.FromJson<OysterVersion>(versionDataAsset.text); // Converts the JSON file into an OysterVersion object
+        scriptVersion = versionData.oysterVersion.packageVersion;
         Debug.Log(versionData.oysterVersion.name + " version " + versionData.oysterVersion.packageVersion + " loaded successfully!"); // Relays the version information to the Unity console
         testText.text = versionData.oysterVersion.packageVersion; // displays the current version on 3D text <- just a sanity check that will be removed later
     }
