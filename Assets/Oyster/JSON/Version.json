@@ -3,10 +3,9 @@
     "name": "Oyster",
     "packageVersion": "3.0.0",
     "supportedCommands": [
-      "CreateBox",
-      "CreateTextBox",
-      "WriteLine",
-      "AddCharacter"
+      "AddSprite",
+      "WaitForInput",
+      "AddTextBox"
     ]
   }
 }

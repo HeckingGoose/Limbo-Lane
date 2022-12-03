@@ -18,10 +18,10 @@ MonoBehaviour:
     Downsample: 0
     Source: 0
     NormalSamples: 1
-    Intensity: 1.08
-    DirectLightingStrength: 0.337
-    Radius: 0.32
-    SampleCount: 7
+    Intensity: 0.67
+    DirectLightingStrength: 0.084
+    Radius: 0.21
+    SampleCount: 6
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

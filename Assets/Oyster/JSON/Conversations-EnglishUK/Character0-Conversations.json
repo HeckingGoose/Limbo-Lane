@@ -1,0 +1,22 @@
+{
+  "container": [
+    {
+      "title": "Dawn-Intro",
+      "scriptVersion": "3.0.0",
+      "commands": [
+        "AddSprite; MainTextBoxSprite; testsprite; Oyster/Sprites/; (300,300); spriteIsCool = true",
+        "AddSprite; sugma; testsprite; Oyster/Sprites/; (700,300); spriteIsCool = true",
+        "AddTextBox; MainTextBox; (300,300); (500,500); font = Oyster/Fonts/Drawn-DefaultSDF.asset",
+        "WaitForInput"
+      ]
+    },
+    {
+      "title": "Dawn-AfterIntro",
+      "scriptVersion": "3.0.0",
+      "commands": [
+        "CommandName; parameter; parameter ; optionalParamater = value",
+        "CommandName; parameter; parameter ; optionalParamater = value"
+      ]
+    }
+  ]
+}

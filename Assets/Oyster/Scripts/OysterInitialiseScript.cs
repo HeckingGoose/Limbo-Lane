@@ -1,19 +1,14 @@
-using System.Collections;
-using System.Collections.Generic; // Import required assemblies
-using UnityEngine;
+using UnityEngine; // Import required assemblies
 
 public class OysterInitialiseScript : MonoBehaviour
 {
     private OysterCharacterScript characterScript; // Setup variables
-    void Start()
-    {
-        
-    }
-
+    private bool mouseHeld = false;
     void FixedUpdate() // Fixed update is used as raycasts are part of Unity's physics system - which work best in a FixedUpdate function
     {
-        if (Input.GetAxis("PrimaryAction") > 0) // Wait for LMB to be pressed
+        if (Input.GetAxis("PrimaryAction") > 0 && mouseHeld == false) // Wait for LMB to be pressed, + if it isn't already pressed
         {
+            mouseHeld = true;
             Ray raycast = Camera.main.ScreenPointToRay(Input.mousePosition); // Create a new raycast between the screen and game world
             RaycastHit hit; // Create an object to store the output of the raycast in
             if (Physics.Raycast(raycast, out hit, maxDistance: 3f)) // True if the raycast collides with an object
@@ -28,6 +23,10 @@ public class OysterInitialiseScript : MonoBehaviour
                     characterScript = null;
                 }
             }
+        }
+        else if (Input.GetAxis("PrimaryAction") == 0) // If the mouse has been released
+        {
+            mouseHeld = false; // Allow another conversation to start if mouse is clicked again
         }
     }
 }

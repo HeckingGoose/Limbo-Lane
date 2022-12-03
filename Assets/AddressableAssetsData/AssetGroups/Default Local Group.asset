@@ -36,13 +36,31 @@ MonoBehaviour:
     m_MainAsset: {fileID: 0}
     m_TargetAsset: {fileID: 0}
   - m_GUID: ae6e924c05f08bb41bceb4cdf36d222b
-    m_Address: Assets/Oyster/JSON/Conversations
+    m_Address: Assets/Oyster/JSON/Conversations-EnglishUK
     m_ReadOnly: 0
     m_SerializedLabels: []
     m_MainAsset: {fileID: 0}
     m_TargetAsset: {fileID: 0}
   - m_GUID: 364bd6826ba2c6145bc814977da738a8
-    m_Address: Assets/Oyster/JSON/Conversations/Character0-Conversations.json
+    m_Address: Assets/Oyster/JSON/Conversations-EnglishUK/Character0-Conversations.json
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: ecefde2fa8c08ed429f40959d0dbac6b
+    m_Address: Assets/Oyster/Sprites
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 70b9134cf44ac684faee48f70cc8a0fe
+    m_Address: Assets/Oyster/Fonts
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 7b460dfa13b61d54699e43e23532fa31
+    m_Address: Assets/Oyster/Fonts/Drawn-DefaultSDF.asset
     m_ReadOnly: 0
     m_SerializedLabels: []
     m_MainAsset: {fileID: 0}
