@@ -6,7 +6,15 @@
       "commands": [
         "AddSprite; MainTextBoxSprite; testsprite; Oyster/Sprites/; (300,300); spriteIsCool = true",
         "AddSprite; sugma; testsprite; Oyster/Sprites/; (700,300); spriteIsCool = true",
-        "AddTextBox; MainTextBox; (300,300); (500,500); font = Oyster/Fonts/Drawn-DefaultSDF.asset",
+        "AddTextBox; MainTextBox; (300,300); (500,500); font = Oyster/Fonts/Drawn-DefaultSDF.asset; colour = #000000; fontSize = 100; text = 'sugma moment'",
+        "AddCharacter; Dawn",
+        "AddCharacter; Cassidy",
+        "AddSmoothText; 'hello peter griffin, welcome to fortnite'; MainTextBox; clickToSkip = true",
+        "ManipulateObject; '1m Reference Cube'; moveTo = (-0.94, 0.5, -4.05); rotateTo = (-16.05, -10.13, 17.3); scaleTo = (1.5, 2, 0.5); interpolation = linear; time = 5; clickToSkip = true",
+        "ManipulateObject; 'Main Camera'; moveTo = (-1.92, 0.8, -2.34); rotateTo = (-25.23, -126.68, 0); interpolation = linear; time = 10; clickToSkip = true",
+        "WaitForInput",
+        "AddCharacterObject; Dawn; DawnTest",
+        "ModifyAnimVariable; Dawn; Waving; boolean; true",
         "WaitForInput"
       ]
     },
