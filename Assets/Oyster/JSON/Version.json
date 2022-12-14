@@ -4,8 +4,14 @@
     "packageVersion": "3.0.0",
     "supportedCommands": [
       "AddSprite",
+      "AddTextBox",
       "WaitForInput",
-      "AddTextBox"
+      "AddCharacter",
+      "AddCharacterObject",
+      "ModifyTextBox",
+      "AddSmoothText",
+      "ManipulateObject",
+      "ModifyAnimVariable"
     ]
   }
 }

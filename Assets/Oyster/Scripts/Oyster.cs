@@ -1,23 +1,23 @@
 using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using TMPro;
 using UnityEngine; // Link required assemblies
 using UnityEngine.AddressableAssets;
-using UnityEngine.Rendering.Universal;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.UI;
-using UnityEngine.UIElements;
 
 public class Oyster : MonoBehaviour
 {
     #region External objects
     [SerializeField]
-    private GameObject HUD;
+    private GameObject HUD; // Store a reference to the scene's HUD so that generated objects can be set to its children
     [SerializeField]
-    private string language = "EnglishUK";
+    private string language = "EnglishUK"; // Language variable that can potentially be changed to allow for multi-language support (too bad I only speak one language :\)
     #endregion
     #region Conversation Variables
+    // These variables need to be cleaned up a bit, maybe create a fontLoader that can be called seperately to load fonts, and make classes to store the variables for each function
     #region Generic
     [SerializeField] // SerializeField allows the variable to be viewable within the Unity editor without exposing it to every other script
     private float speechCooldownTime = 2;
@@ -38,16 +38,9 @@ public class Oyster : MonoBehaviour
     private List<String> gameObjectsNames = new List<String>();
     private CharacterDataContainer characters;
     private bool charactersLoaded = false;
-    private IDictionary<string, CharacterData> charactersInConversation = new Dictionary<string, CharacterData>();
-    private IDictionary<string, GameObject> characterObjectsInConversation = new Dictionary<string, GameObject>();
-    #endregion
-    #region AddSprite
-    private Sprite loadedSprite;
-    private int loaded = 0; //0 means unloaded, 1 means loading, 2 means loaded
-    #endregion
-    #region AddTextBox
-    private int fontLoaded = 0;
-    private TMP_FontAsset loadedFont = null;
+    private Dictionary<string, CharacterData> charactersInConversation = new Dictionary<string, CharacterData>();
+    private Dictionary<string, GameObject> characterObjectsInConversation = new Dictionary<string, GameObject>();
+    private Dictionary<string, string> conversationStrings = new Dictionary<string, string>();
     #endregion
     #region WaitForInput
     private float waitingTime = 0;
@@ -66,23 +59,55 @@ public class Oyster : MonoBehaviour
     private bool modObj_rotating;
     private bool modObj_scaling;
     private bool modObj_clickToSkip;
+    private bool modObj_manipulatePermanent;
+    private bool modObj_relativeTargetPosition;
     private float modObj_currentTime;
     private float modObj_totalTime;
     private string modObj_interpolation;
     private Vector3 modObj_newPosition;
-    private Quaternion modObj_newRotation;
+    private Vector3 modObj_newRotation;
     private Vector3 modObj_newScale;
     private Vector3 modObj_ogPosition;
-    private Quaternion modObj_ogRotation;
+    private Vector3 modObj_ogRotation;
     private Vector3 modObj_ogScale;
+    private Dictionary<int, ObjectAndPosition> modObj_objectsToFix = new Dictionary<int, ObjectAndPosition>();
+    #endregion
+    #region ModifyAnimVariable
+    private bool modAnimVar_objectFound = false;
+    private Animator modAnimVar_animator;
+    #endregion
+    #region LegacyPlayAnimation
+    private int legacyPlayAnim_animState = 0;
+    private bool legacyPlayAnim_waitOnAnim;
+    private Animation legacyPlayAnim_targetAnimation;
     #endregion
     #region PlayAnimation
-    private bool playAnim_objectFound = false;
-    private Animator playAnim_animator;
+    private int playAnim_animState = 0;
+    private bool playAnim_waitOnAnim;
+    private Animator playAnim_targetAnimator;
+    private string playAnim_layerName;
+    private string playAnim_animName;
+    #endregion
+    #region AddInputField
+    private bool inpField_created = false;
+    private string inpField_textInput = null;
+    private GameObject inpField_output;
+    #endregion
+    #region Addressables variables
+    #region General
+    private Dictionary<int, AsyncOperationHandle> loadedAddressables = new Dictionary<int, AsyncOperationHandle>(); // Acts as a list of references for addressables that cannot be unloaded until they stop being used. Such as sprites or fonts
+    #endregion
+    #region Font loading
+    private int fontLoaded = 0;
+    private TMP_FontAsset loadedFont;
+    private Dictionary<string, TMP_FontAsset> loadedFonts = new Dictionary<string, TMP_FontAsset>();
+    #endregion
+    #region Sprite loading
+    private int spriteLoaded = 0;
+    private Sprite loadedSprite;
+    private Dictionary<string, Sprite> loadedSprites = new Dictionary<string, Sprite>();
     #endregion
     #endregion
-    #region Script-wide addressables variables
-    IDictionary<string, AsyncOperationHandle> loadedAddressables = new Dictionary<string, AsyncOperationHandle>(); // Acts as a list of references for addressables that cannot be unloaded until they stop being used. Such as sprites or fonts
     #endregion
     void Start()
     {
@@ -92,7 +117,7 @@ public class Oyster : MonoBehaviour
         #endregion
         #region Starting the process of loading character data
         AsyncOperationHandle<TextAsset> characterDataHandle = Addressables.LoadAssetAsync<TextAsset>("Assets/Oyster/JSON/Characters.json");
-        characterDataHandle.Completed += CharacterDataHandle_Completed;
+        characterDataHandle.Completed += CharacterDataHandle_Completed; // Begins loading character data and points the loader to a method that it can call on completion
         #endregion
     }
     private void Update()
@@ -144,11 +169,11 @@ public class Oyster : MonoBehaviour
             {
                 try // Attempt to interpret the command at index currentLine
                 {
-                    bool removingBlank = true;
-                    string tempString = "";
+                    bool removingBlank = true; // Spaces default to not being read
+                    string tempString = ""; // Custom way of parsing the line. It simply checks through each character stores everything but spaces, unless the spaces are between ''
                     foreach (char chr in currentConversation.commands[currentLine])
                     {
-                        if (chr == '\'')
+                        if (chr == '\'') // When a ' is recognised, invert whether spaces are read or not
                         {
                             if (removingBlank)
                             {
@@ -159,16 +184,16 @@ public class Oyster : MonoBehaviour
                                 removingBlank = true;
                             }
                         }
-                        if (removingBlank && chr != ' ')
+                        if (removingBlank && chr != ' ') // If spaces are being removed, and the current character is not a space
                         {
-                            tempString += chr;
+                            tempString += chr; // Add a character to tempString
                         }
-                        else if (!removingBlank)
+                        else if (!removingBlank) // If spaces are not being removed
                         {
-                            tempString += chr;
+                            tempString += chr; // Add a character to tempString
                         }
                     }
-                    tempString = tempString.Replace("'", "");
+                    tempString = tempString.Replace("'", ""); // Removes leftover ''
                     string[] currentLineData = tempString.Split(';'); // Split input string into a series of strings along the ; character
                     string currentLineCommand = currentLineData[0]; // Sets the current command to the first string within currentLineData
                     string[] currentLineParameters = new string[currentLineData.Length - 1]; // Initialises currentLineParameters with a fixed size
@@ -192,23 +217,41 @@ public class Oyster : MonoBehaviour
                                 lineAlreadyProcessed = true;
                             }
                             break;
-                        case "AddCharacter": // Not yet implemented
+                        case "AddCharacter": // Calls the AddCharacter method when the command AddCharacter is read
                             AddCharacter(currentLineParameters);
                             break;
-                        case "AddCharacterObject":
+                        case "AddCharacterObject": // Calls the AddCharacterObject method when the command AddCharacterObject is read
                             AddCharacterObject(currentLineParameters);
                             break;
-                        case "ModifyTextBox":
+                        case "ModifyTextBox": // Calls the ModifyTextBox method when the command ModifyTextBox is read
                             ModifyTextBox(currentLineParameters);
                             break;
-                        case "AddSmoothText":
+                        case "AddSmoothText": // Calls the AddSmoothText method when the command AddSmoothText is read
                             AddSmoothText(currentLineParameters);
                             break;
-                        case "ManipulateObject":
+                        case "ManipulateObject": // Calls the ManipulateObject method when the command ManipulateObject is read
                             ManipulateObject(currentLineParameters);
                             break;
-                        case "ModifyAnimVariable":
+                        case "ModifyAnimVariable": // Calls the ModifyAnimVariable method when the command ModifyAnimVariable is read
                             ModifyAnimVariable(currentLineParameters);
+                            break;
+                        case "AddInputField": // Calls teh AddInputField method when the command AddInputField is read
+                            AddInputField(currentLineParameters);
+                            break;
+                        case "LoadFont":
+                            LoadFont(currentLineParameters);
+                            break;
+                        case "LoadSprite":
+                            LoadSprite(currentLineParameters);
+                            break;
+                        case "LegacyPlayAnimation":
+                            LegacyPlayAnimation(currentLineParameters);
+                            break;
+                        case "PlayAnimation":
+                            PlayAnimation(currentLineParameters);
+                            break;
+                        case "SetAnimLayerWeight":
+                            SetAnimLayerWeight(currentLineParameters);
                             break;
                     }
                     failedReadAttempts = 0; // Resets the total failures of this try statement to 0
@@ -231,27 +274,32 @@ public class Oyster : MonoBehaviour
 
         }
         #endregion
-
     }
-    #region Loading character data
-    private void CharacterDataHandle_Completed(AsyncOperationHandle<TextAsset> handle)
+    #region Waiting for Input submission
+    private void OnInputSubmit(string input)
     {
-        if (handle.Status == AsyncOperationStatus.Succeeded)
+        inpField_textInput = input;
+    }
+    #endregion
+    #region Loading character data
+    private void CharacterDataHandle_Completed(AsyncOperationHandle<TextAsset> handle) // Method that is called when the characterDataLoader finishes
+    {
+        if (handle.Status == AsyncOperationStatus.Succeeded) // If the asset was loaded successfully
         {
-            try
+            try // Try to parse the loaded asset
             {
-                characters = JsonUtility.FromJson<CharacterDataContainer>(handle.Result.text);
+                characters = JsonUtility.FromJson<CharacterDataContainer>(handle.Result.text); // Convert the asset from JSON into a custom class
             }
             catch
             {
-                Debug.Log("Characters.json not in the correct format!");
-                characters = JsonUtility.FromJson<CharacterDataContainer>(handle.Result.text);
+                Debug.Log("Characters.json not in the correct format!"); // Inform the Unity console that the asset is not formatted properly
+                characters = new CharacterDataContainer(); // Return an empty value
             }
         }
-        else
+        else // If the asset was loaded unsuccessfully
         {
-            Debug.Log("Character data failed to load!");
-            characters = new CharacterDataContainer();
+            Debug.Log("Character data failed to load!"); // Inform the Unity console that the asset did not load
+            characters = new CharacterDataContainer(); // Return an empty value
         }
         Addressables.Release(handle);
         charactersLoaded = true;
@@ -263,38 +311,34 @@ public class Oyster : MonoBehaviour
         if (handle.Status == AsyncOperationStatus.Succeeded) // If the fontloader succeeded
         {
             loadedFont = handle.Result; // Set the loaded font to the loaded font
-            fontLoaded = 2; // Tell the script that a font has finished loading
-            AddTextBox(tempParams); // Call the method that originally called it
-            loadedAddressables.Add(loadedAddressables.Count.ToString(), handle); // Add the font to the list of currently loaded addressables
+            loadedAddressables.Add(loadedAddressables.Count, handle); // Add the font to the list of currently loaded addressables
         }
         else // If the fontlooader failed
         {
             Debug.Log("Font failed to load! Returning null..."); // Tell the Unity console that the font failed to load
             loadedFont = null; // Set the loaded font to be null
-            loaded = 2; // Tell the script that loading has finished
-            AddTextBox(tempParams); // Call the method that originally called it
             Addressables.Release(handle); // Release the fontloader from memory
         }
+        fontLoaded = 2;
+        LoadFont(tempParams);
     }
     #endregion
     #region Loading sprite data
     private void SpriteHandle_Completed(AsyncOperationHandle<Sprite> handle) // This method runs once addressables has finished loading a sprite
     {
-        if (handle.Status == AsyncOperationStatus.Succeeded) // If the spriteloader succeeded
+        if (handle.Status == AsyncOperationStatus.Succeeded)
         {
-            loadedSprite = handle.Result; // Set the loaded sprite to be equal to the result of the spriteloader
-            loaded = 2; // Tell the sprite loader that the sprite has finished loading
-            AddSprite(tempParams); // Call the method that originally called it
-            loadedAddressables.Add(loadedAddressables.Count.ToString(), handle); // Add the loaded sprite to the list of currently loaded addressables
+            loadedSprite = handle.Result;
+            loadedAddressables.Add(loadedAddressables.Count, handle);
         }
         else
         {
-            Debug.Log("Sprite failed to load! Returning null..."); // Inform the Unity console that the sprite has failed to load
-            loadedSprite = null; // Return a null sprite
-            loaded = 2; // Tell the script that sprite loading has finsihed
-            AddSprite(tempParams); // Call the method that originally called it
-            Addressables.Release(handle); // Release the spriteloader from memory
+            Debug.Log("Sprite failed to load! Returning null...");
+            loadedSprite = null;
+            Addressables.Release(handle);
         }
+        spriteLoaded = 2;
+        LoadSprite(tempParams);
     }
     #endregion
     #region Loading conversation data
@@ -351,25 +395,15 @@ public class Oyster : MonoBehaviour
         // Required Parameters:
         // param0: object name
         // param1: sprite name
-        // param2: sprite path
-        // param3: position
+        // param2: position
         // Optional Parameters:
         // param: spriteIsCool = bool
-        if (loaded == 0) // If no loading has taken place so far
+        try
         {
-            AsyncOperationHandle<Sprite> spriteHandle = Addressables.LoadAssetAsync<Sprite>("Assets/" + parameters[2] + parameters[1] + ".png"); // Begins loading the sprite from a location provided as part of the method's parameters
-            spriteHandle.Completed += SpriteHandle_Completed; // Tells the loader to call the listed method when it finishes
-            tempParams = parameters; // Stores the method's parameters externally for when the script is called again from the spriteloader
-            loaded = 1; // Sets loaded to 1, meaning that the sprite is loading
-        }
-        else if (loaded == 2) // When the sprite has finsihed loading
-        {
-            loaded = 0; // Set loading to 0 for the next time that this method is called
-            tempParams = null; // Set tempParams back to being null for the same reason as above
-            Sprite sprite = loadedSprite; // Set the variable sprite equal to loadedSprite
+            Sprite sprite = loadedSprites[parameters[1]]; // Set the variable sprite equal to loadedSprite
             loadedSprite = null; // Set loadedSprite to null for when this method is called again
             string name = parameters[0]; // Set the variable name equal to the first parameter
-            Vector2 position = String2Vector(parameters[3]); // Translate the fourth parameter into the sprite's on-screen position
+            Vector2 position = String2Vector(parameters[2]); // Translate the fourth parameter into the sprite's on-screen position
             Vector2 size = new Vector2(100, 100); // Set the variable size equal to a default value
             try // Try to run the below code
             {
@@ -383,19 +417,19 @@ public class Oyster : MonoBehaviour
             bool spriteIsCool = false; // Testing variable that I will likely keep in just for testing purposes
             if (parameters.Length > 4)
             {
-                string[] currentParam;
-                for(int i = 0; i < parameters.Length - 4; i++) // Loop through all optional parameters
+                string[] currentParameter;
+                for (int i = 0; i < parameters.Length - 4; i++) // Loop through all optional parameters
                 {
-                    currentParam = parameters[4 + i].Split('='); // split the optional parameter into a name and a data value
-                    switch (currentParam[0])
+                    currentParameter = parameters[4 + i].Split('='); // split the optional parameter into a name and a data value
+                    switch (currentParameter[0])
                     {
                         default:
-                            Debug.Log("Parameter '" + currentParam[0] + "' not recognised, ignoring parameter..."); // If the name is not recognized then inform the Unity console that the command 'name' is not recognised
+                            Debug.Log("Parameter '" + currentParameter[0] + "' not recognised, ignoring parameter..."); // If the name is not recognized then inform the Unity console that the command 'name' is not recognised
                             break;
                         case "spriteIsCool": // If the parameter is 'spriteIsCool'
                             try // Attempt to run the below code
                             {
-                                spriteIsCool = Convert.ToBoolean(currentParam[1]); // Convert the parameter's value into a boolean and store that in spriteIsCool
+                                spriteIsCool = Convert.ToBoolean(currentParameter[1]); // Convert the parameter's value into a boolean and store that in spriteIsCool
                             }
                             catch // If the above code fails to run
                             {
@@ -405,7 +439,7 @@ public class Oyster : MonoBehaviour
                     }
                 }
             }
-            Vector2 drawPosition = new Vector2((position.x-960) + size.x/2, (540-position.y) - size.y/2); // Since sprites and the canvas have (0,0) to be their centre, do a little maths to figure out where the draw position should be for (0,0) to be the top left
+            Vector2 drawPosition = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Since sprites and the canvas have (0,0) to be their centre, do a little maths to figure out where the draw position should be for (0,0) to be the top left
             GameObject output = new GameObject(); // Create a new gameobject
             output.name = name; // Set it's name equal to the name given in the method's parameters
             output.transform.parent = HUD.transform.GetChild(0); // Make the object a child of the HUD's child object 'Sprites'
@@ -416,9 +450,13 @@ public class Oyster : MonoBehaviour
             output.AddComponent<CanvasRenderer>(); // Add a CanvasRenderer component so that the object is rendered to the HUD
             UnityEngine.UI.Image outputImage = output.AddComponent<UnityEngine.UI.Image>(); // Add an Image component to the object
             outputImage.sprite = sprite; // Set the sprite value of the Image component equal to the loaded sprite
-            currentLine++; // Increment currentLine
             gameObjectsNames.Add(name); // Add this object to the list of loaded objects
         }
+        catch
+        {
+            Debug.Log("Sprite '" + parameters[1] + "' not currently loaded.");
+        }
+        currentLine++;
     }
     #endregion
     #region AddTextBox
@@ -429,86 +467,74 @@ public class Oyster : MonoBehaviour
         // param1: position
         // param2: size
         // Optional Parameters:
-        // param: font = TMP_FontAsset
+        // param: font = string
         // param: text = string
         // param: fontSize int
         // param: colour = hex colour (#FFFFFF)
-        if (fontLoaded != 1) // If a font is currently not loading
+
+        TMP_FontAsset font = null;
+        string text = "";
+        int fontSize = 56;
+        Color fontColour = new Color(0, 0, 0);
+        if (parameters.Length > 3) // If there are optional parameters
         {
-            string fontName = null; // Set the fontName to a default value
-            string text = "";
-            int fontSize = 56;
-            Color fontColour = new Color(0, 0, 0);
-            if (parameters.Length > 3) // If there are optional parameters
+            string[] currentParameter;
+            for (int i = 0; i < parameters.Length - 3; i++) // Loop through all optional parameters
             {
-                string[] currentParam;
-                for (int i = 0; i < parameters.Length - 3; i++) // Loop through all optional parameters
+                currentParameter = parameters[3 + i].Split('='); // Split the current optional parameter into a name and a value
+                switch (currentParameter[0])
                 {
-                    currentParam = parameters[3 + i].Split('='); // Split the current optional parameter into a name and a value
-                    switch (currentParam[0])
-                    {
-                        default:
-                            Debug.Log("Parameter '" + currentParam[0] + "' not recognised, ignoring parameter..."); // If the parameter name is not recognized then inform the Unity console that a parameter name was not recognised
-                            break;
-                        case "font": // If the parameter is 'font'
-                            if (fontLoaded == 0) // If a font has not already been loaded
-                            {
-                                fontName = currentParam[1]; // Set the fontName equal to the parameter value
-                                fontLoaded = 1; // Tell the script that a font is currently loading
-                                AsyncOperationHandle<TMP_FontAsset> fontLoader = Addressables.LoadAssetAsync<TMP_FontAsset>("Assets/" + fontName); // Begin loading the font
-                                fontLoader.Completed += FontHandle_Completed; // Tell the fontloader to call this method once it finishes
-                                tempParams = parameters; // Set tempParams equal to the input parameter for when the method is called again
-                            }
-                            break;
-                        case "text":
-                            text = currentParam[1];
-                            break;
-                        case "fontSize":
-                            try
-                            {
-                                fontSize = Convert.ToInt32(currentParam[1]);
-                            }
-                            catch
-                            {
-                                Debug.Log("Failed to convert " + currentParam[0] + " to an integer.");
-                            }
-                            break;
-                        case "colour":
-                            ColorUtility.TryParseHtmlString(currentParam[1], out fontColour);
-                            break;
-                    }
+                    default:
+                        Debug.Log("Parameter '" + currentParameter[0] + "' not recognised, ignoring parameter..."); // If the parameter name is not recognized then inform the Unity console that a parameter name was not recognised
+                        break;
+                    case "font": // If the parameter is 'font'
+                        try
+                        {
+                            font = loadedFonts[currentParameter[1]];
+                        }
+                        catch
+                        {
+                            Debug.Log("Font '" + currentParameter[1] + "' not currently loaded.");
+                        }
+                        break;
+                    case "text": // If the parameter is 'text'
+                        text = currentParameter[1]; // set text equal to the currentParameter
+                        break;
+                    case "fontSize": // If the parameter is 'fontSize'
+                        try // Attempt to parse the currentParameter as an integer
+                        {
+                            fontSize = Convert.ToInt32(currentParameter[1]);
+                        }
+                        catch // If it fails, then inform the Unity console
+                        {
+                            Debug.Log("Failed to convert " + currentParameter[0] + " to an integer.");
+                        }
+                        break;
+                    case "colour": // If the parameter is 'colour'
+                        ColorUtility.TryParseHtmlString(currentParameter[1], out fontColour); // Attempt to convert the input colour from hex to rgb
+                        break;
                 }
-            }
-            if (fontLoaded == 0) // If no font needed to be loaded
-            {
-                fontLoaded = 2; // Then set the value of fontLoaded to 2, meaning that any fontloading has finished
-                loadedFont = null; // Set the loadedFont to be null as no font was loaded
-            }
-            if (fontLoaded == 2) // Once a font has been loaded, or supposedly loaded, then do this
-            {
-                fontLoaded = 0; // Set fontLoaded back to 0 for the next time this method is used
-                GameObject output = new GameObject(); // Create a new gameobject
-                output.transform.parent = HUD.transform.GetChild(1); // Set the object to be a child of the HUD's child 'Text'
-                RectTransform outputRectTransform = output.AddComponent<RectTransform>(); // Add a RectTransform component to the object
-                TextMeshProUGUI outputTextMesh = output.AddComponent<TextMeshProUGUI>(); // Add a TextMeshProUGUI component to the object
-                output.name = parameters[0]; // Set the name of the object equal to the first parameter
-                Vector2 size = String2Vector(parameters[2]); // Translate the third parameter to a vector and then set that equal to the variable 'size'
-                outputRectTransform.sizeDelta = size; // Set the object's size equal to the size variable
-                outputRectTransform.localScale = new Vector3(1, 1, 1); // Set the scale of the object to 1
-                Vector2 position = String2Vector(parameters[1]); // Translate the second parameter to a vector which can then be set as the variable 'position'
-                outputRectTransform.anchoredPosition = new Vector2((position.x-960) + size.x/2, (540-position.y) - size.y/2); // Set the object's position equal to position + some maths to figure out where the top left of the canvas and the object is
-                gameObjectsNames.Add(parameters[0]); // Add the object to the list of currently created objects
-                if (loadedFont != null) // If a font was loaded
-                {
-                    outputTextMesh.font = loadedFont; // Set the object's font to the loadedFont
-                    loadedFont = null; // Set the loaded font back to being null
-                }
-                outputTextMesh.text = text;
-                outputTextMesh.fontSize = fontSize;
-                outputTextMesh.color = fontColour;
-                currentLine++; // Increment currentLine
             }
         }
+        GameObject output = new GameObject(); // Create a new gameobject
+        output.transform.parent = HUD.transform.GetChild(1); // Set the object to be a child of the HUD's child 'Text'
+        RectTransform outputRectTransform = output.AddComponent<RectTransform>(); // Add a RectTransform component to the object
+        TextMeshProUGUI outputTextMesh = output.AddComponent<TextMeshProUGUI>(); // Add a TextMeshProUGUI component to the object
+        output.name = parameters[0]; // Set the name of the object equal to the first parameter
+        Vector2 size = String2Vector(parameters[2]); // Translate the third parameter to a vector and then set that equal to the variable 'size'
+        outputRectTransform.sizeDelta = size; // Set the object's size equal to the size variable
+        outputRectTransform.localScale = new Vector3(1, 1, 1); // Set the scale of the object to 1
+        Vector2 position = String2Vector(parameters[1]); // Translate the second parameter to a vector which can then be set as the variable 'position'
+        outputRectTransform.anchoredPosition = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Set the object's position equal to position + some maths to figure out where the top left of the canvas and the object is
+        gameObjectsNames.Add(parameters[0]); // Add the object to the list of currently created object
+        if (font != null)
+        {
+            outputTextMesh.font = font;
+        }
+        outputTextMesh.text = text;
+        outputTextMesh.fontSize = fontSize;
+        outputTextMesh.color = fontColour;
+        currentLine++; // Increment currentLine
     }
     #endregion
     #region WaitForInput
@@ -529,14 +555,14 @@ public class Oyster : MonoBehaviour
                 {
                     foreach (string param in parameters) // Loop through the parameters
                     {
-                        string[] currentParam = param.Split('='); // Split the current parameter into a name and a value
-                        switch (currentParam[0])
+                        string[] currentParameter = param.Split('='); // Split the current parameter into a name and a value
+                        switch (currentParameter[0])
                         {
                             default: // If the parameter is not recognized
-                                Debug.Log("Parameter '" + currentParam[0] + "' not recognised, ignoring parameter..."); // Inform the Unity console of the name of the parameter that was not recognised
+                                Debug.Log("Parameter '" + currentParameter[0] + "' not recognised, ignoring parameter..."); // Inform the Unity console of the name of the parameter that was not recognised
                                 break;
                             case "defaultForwardTime": // If the parameter was defaultForwardTime
-                                maxWaitTime = float.Parse(currentParam[1]); // Sets the max wait time to the parameter value
+                                maxWaitTime = float.Parse(currentParameter[1]); // Sets the max wait time to the parameter value
                                 autoSkip = true; // Sets autoSkip back to true
                                 break;
                         }
@@ -555,7 +581,7 @@ public class Oyster : MonoBehaviour
                 waitingTime += Time.deltaTime; // Add the current time between each frame to the waitingTime
             }
         }
-        if(Input.GetAxis("PrimaryAction") > 0 && !mouseDown) // If the mouse is clicked and not held
+        if (Input.GetAxis("PrimaryAction") > 0 && !mouseDown) // If the mouse is clicked and not held
         {
             waitingTime = 0;
             maxWaitTime = 1; // Set variables back to their default values
@@ -569,23 +595,23 @@ public class Oyster : MonoBehaviour
     {
         // Required Parameters:
         // param0: character name
-        if (charactersLoaded)
+        if (charactersLoaded) // If the list of characters has finished loading (only relevant for slow drives or a script that has this command being called the moment a scene starts)
         {
-            string characterName = parameters[0].ToLower();
-            bool addedCharacter = false;
-            foreach (CharacterData character in characters.characters)
+            string characterName = parameters[0].ToLower(); // Set characterName equal to the first parameter
+            bool addedCharacter = false; // Set addedCharacter to false
+            foreach (CharacterData character in characters.characters) // loop through each character in the previously loaded list of characters
             {
-                if (characterName == character.altName.ToLower())
+                if (characterName == character.altName.ToLower()) // If the characterName input is the same as the altName of the character entry currently being looked at
                 {
-                    charactersInConversation.Add(character.altName, character); // All character alt names should be unique
-                    addedCharacter = true;
+                    charactersInConversation.Add(character.altName, character); // Add the character to the dictionary of characters in the conversation, using their altName as the key
+                    addedCharacter = true; // Set addedCharacter to true
                 }
             }
-            if (!addedCharacter)
+            if (!addedCharacter) // If addedCharacter was never set to true
             {
-                Debug.Log("Unable to find character '" + characterName + "'.");
+                Debug.Log("Unable to find character '" + characterName + "'."); // Inform Unity that the character could not be found
             }
-            currentLine++;
+            currentLine++; // Continue to the next line
         }
     }
     #endregion
@@ -595,16 +621,16 @@ public class Oyster : MonoBehaviour
         // Required Parameters:
         // param0: character altName
         // param1: character object name
-        try
+        try // Attempt to run the below code
         {
-            GameObject output = GameObject.Find(parameters[1]);
-            characterObjectsInConversation.Add(parameters[0], output);
+            GameObject output = GameObject.Find(parameters[1]); // Find a gameobject by the value of the second input parameter
+            characterObjectsInConversation.Add(parameters[0], output); // Add the previously found object to a dictionary of characters in the scene, with the first input parameter being used as a key
         }
-        catch
+        catch // If the above code fails to run
         {
-            Debug.Log("Unable to find and add " + parameters[0] + "'s character object '" + parameters[1] + "'.");
+            Debug.Log("Unable to find and add " + parameters[0] + "'s character object '" + parameters[1] + "'."); // Inform the Unity console that the object could not be found and added to the dictionary
         }
-        currentLine++;
+        currentLine++; // Continue to the next line
     }
     #endregion
     #region ModifyTextBox
@@ -619,56 +645,67 @@ public class Oyster : MonoBehaviour
         // param: colour = hex colour (#FFFFFF)
         // param: fontSize = int
         // param: text = string
-        try
+        // param: font = string
+        try // Attempt to run the below code
         {
-            GameObject output = GameObject.Find(parameters[0]);
-            RectTransform outputRectTransform = output.GetComponent<RectTransform>();
-            TextMeshProUGUI outputTextMesh = output.GetComponent<TextMeshProUGUI>();
-            for (int i = 1; i < parameters.Length - 1; i++)
+            GameObject output = GameObject.Find(parameters[0]); // Find a gameobject by the first input parameter
+            RectTransform outputRectTransform = output.GetComponent<RectTransform>(); // Find the object's RectTransform component
+            TextMeshProUGUI outputTextMesh = output.GetComponent<TextMeshProUGUI>(); // Find the object's TextMesh component
+            for (int i = 1; i < parameters.Length - 1; i++) // Loop through all parameters given except for the first parameter
             {
-                string[] currentParameter = parameters[i].Split('=');
-                switch (currentParameter[0])
+                string[] currentParameter = parameters[i].Split('='); // Split the current parameter into a name and a value
+                switch (currentParameter[0]) // Compare the parameter name against a list of 'choices'
                 {
-                    default:
-                        Debug.Log("Parameter '" + currentParameter[1] + "' not recognised.");
+                    default: // If the parameter name is not recognised
+                        Debug.Log("Parameter '" + currentParameter[1] + "' not recognised."); // Inform the Unity console that the parameter was not recognised
                         break;
-                    case "newName":
-                        output.name = currentParameter[1];
+                    case "newName": // If the parameter is 'newName'
+                        output.name = currentParameter[1]; // Set the previously found gameobject's name to the current parameter's value
                         break;
-                    case "size":
-                        outputRectTransform.sizeDelta = String2Vector(parameters[i]);
+                    case "size": // If the parameter is 'size'
+                        outputRectTransform.sizeDelta = String2Vector(parameters[i]); // Convert the currentParameter value to a Vector2 and then set the size of the found object to that value
                         break;
-                    case "position":
-                        Vector2 size = outputRectTransform.sizeDelta;
-                        Vector2 position = String2Vector(currentParameter[1]);
-                        outputRectTransform.anchoredPosition = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2);
+                    case "position": // If the parameter is 'position'
+                        Vector2 size = outputRectTransform.sizeDelta; // Find the size of the previously stored object
+                        Vector2 position = String2Vector(currentParameter[1]); // Find the position of the object using the current parameter value and String2Vector
+                        outputRectTransform.anchoredPosition = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Do some funky maths to place the object at its intended position from its top left corner, not the centre
                         break;
-                    case "colour":
-                        Color fontColour = new Color();
-                        ColorUtility.TryParseHtmlString(parameters[i], out fontColour);
-                        outputTextMesh.color = fontColour;
+                    case "colour": // If the parameter is 'colour'
+                        Color fontColour = new Color(); // Create a new colour object
+                        ColorUtility.TryParseHtmlString(parameters[i], out fontColour); // Attempt to parse the current parameter value as a hex colour
+                        outputTextMesh.color = fontColour; // Set the object's TextMesh's colour to the found colour
                         break;
-                    case "fontSize":
+                    case "fontSize": // If the parameter is 'fontSize'
+                        try // Attempt to run the below code
+                        {
+                            outputTextMesh.fontSize = Convert.ToInt32(currentParameter[1]); // Set the object's TextMesh's fontSize equal to the input parameter's value converted to an integer
+                        }
+                        catch // If the above code fails to run
+                        {
+                            Debug.Log("Failed to convert " + currentParameter[0] + " to an integer."); // Inform the Unity console that the above code failed to run
+                        }
+                        break;
+                    case "text": // If the parameter it 'text'
+                        outputTextMesh.text = currentParameter[1]; // Set the text value of the object's TextMesh to the current parameter value
+                        break;
+                    case "font":
                         try
                         {
-                            outputTextMesh.fontSize = Convert.ToInt32(currentParameter[1]);
+                            outputTextMesh.font = loadedFonts[currentParameter[1]];
                         }
                         catch
                         {
-                            Debug.Log("Failed to convert " + currentParameter[0] + " to an integer.");
+                            Debug.Log("Font '" + currentParameter[1] + "' not currently loaded.");
                         }
-                        break;
-                    case "text":
-                        outputTextMesh.text = currentParameter[1];
                         break;
                 }
             }
         }
-        catch
+        catch // If any of the above code fails to run
         {
-            Debug.Log("GameObject '" + parameters[0] + "' does not exist in the current scene.");
+            Debug.Log("GameObject '" + parameters[0] + "' does not exist in the current scene."); // Inform the Unity console that something has gone wrong
         }
-        currentLine++;
+        currentLine++; // Continue to the next line
     }
     #endregion
     #region AddSmoothText
@@ -679,71 +716,76 @@ public class Oyster : MonoBehaviour
         // param1: object to add text to
         // Optional Parameters:
         // param: clickToSkip = bool
-        smoothTextWaitTime += Time.deltaTime;
-        if (smoothTextWaitTime * charactersPerSecond >= 1)
+        smoothTextWaitTime += Time.deltaTime; // Add the time between the last frame and this frame to the current wait time
+        if (smoothTextWaitTime * charactersPerSecond >= 1) // If the wait time multiplied by the total characters per second exceeds 1
         {
-            int charactersToAdd = Convert.ToInt32(smoothTextWaitTime);
-            smoothTextWaitTime = (smoothTextWaitTime * charactersPerSecond) % 1;
-            TextMeshProUGUI outputTextMesh = null;
-            try
+            int charactersToAdd = Convert.ToInt32(smoothTextWaitTime); // Truncate the current wait time to find how many characters need to be added - this will almost always return one, however it is here to handle sudden frame dips where delta time may be more than 1
+            smoothTextWaitTime = (smoothTextWaitTime * charactersPerSecond) % 1; // Remove any value on the left of the decimal point
+            TextMeshProUGUI outputTextMesh = null; // Create a default value for a TextMesh
+            try // Attempt to run the below code
             {
-                outputTextMesh = GameObject.Find(parameters[1]).GetComponent<TextMeshProUGUI>();
+                outputTextMesh = GameObject.Find(parameters[1]).GetComponent<TextMeshProUGUI>(); // Attempt to find an object and its TextMesh
             }
-            catch
+            catch // If the above code fails
             {
-                Debug.Log("Failed to find text box '" + parameters[1] + "' to add characters to!");
+                Debug.Log("Failed to find text box '" + parameters[1] + "' to add characters to!"); // Inform the Unity console that the above code failed
             }
-            for (int i = 0; i < charactersToAdd; i++)
+            for (int i = 0; i < charactersToAdd; i++) // Loop through every character that needs to be added
             {
-                try
+                try // Attempt to run the below code
                 {
-                    outputTextMesh.text += parameters[0][i+currentCharIndex];
+                    outputTextMesh.text += parameters[0][i + currentCharIndex]; // Add the character at index i + currentCharIndex to the object's text
                 }
-                catch
+                catch // If any of the above code fails to run
                 {
-                    Debug.Log("Character to add is out of range!");
-                    currentCharIndex = 0;
-                    currentLine++;
+                    Debug.Log("Character to add is out of range!"); // Inform the Unity console that something went wrong
+                    currentCharIndex = 0; // Reset the currentCharIndex to 0
+                    currentLine++; // Continue to the next line
                 }
             }
-            currentCharIndex += charactersToAdd;
+            currentCharIndex += charactersToAdd; // Add charactersToAdd to the currentCharIndex
         }
-        bool clickToSkip = false;
-        for (int i = 0; i < parameters.Length - 2; i++)
+        bool clickToSkip = true; // Create clickToSkip and set it to its default value of true
+        for (int i = 0; i < parameters.Length - 2; i++) // Loop through every parameter except for the first 2
         {
-            string[] currentParameter = parameters[i + 2].Split('=');
-            switch (currentParameter[0])
+            string[] currentParameter = parameters[i + 2].Split('='); // Split the current parameter into a name and a value
+            switch (currentParameter[0]) // compare the name of the current parameter against each of these options
             {
-                default:
-                    Debug.Log("Parameter '" + currentParameter[0] + "' not recognised.");
+                default: // If the name of the current parameter is not recognised
+                    Debug.Log("Parameter '" + currentParameter[0] + "' not recognised."); // Inform the Unity console that the current parameter was not recognised
                     break;
-                case "clickToSkip":
-                    clickToSkip = true;
+                case "clickToSkip": // If the current parameter's name is 'clickToSkip'
+                    try // Attempt to run the below code
+                    {
+                        clickToSkip = Convert.ToBoolean(currentParameter[1]); // Conver the current parameter value to a boolean and store it in clickToSkip
+                    }
+                    catch // If any of the below code fails to run
+                    {
+                        Debug.Log("Unable to convert '" + currentParameter[1] + "' into a boolean value."); // Inform the Unity console that something went wrong
+                    }
                     break;
             }
         }
-        if (clickToSkip && !mouseDown && Input.GetAxis("PrimaryAction") > 0)
+        if (clickToSkip && !mouseDown && Input.GetAxis("PrimaryAction") > 0) // If clickToSkip is true, the mouse is not currently held and the mouse has been clicked
         {
-            mouseDown = true;
-            TextMeshProUGUI outputTextMesh = null;
-            try
+            mouseDown = true; // Set mouseDown to true
+            TextMeshProUGUI outputTextMesh = null; // create an empty TextMesh variable
+            try // Attempt to run the below code
             {
-                outputTextMesh = GameObject.Find(parameters[1]).GetComponent<TextMeshProUGUI>();
+                outputTextMesh = GameObject.Find(parameters[1]).GetComponent<TextMeshProUGUI>(); // Find an object's TextMesh using the second input parameter
             }
-            catch
+            catch // If any of the above code fails to run
             {
-                Debug.Log("Failed to find text box '" + parameters[1] + "' to add characters to!");
+                Debug.Log("Failed to find text box '" + parameters[1] + "' to add characters to!"); // Inform the Unity console that something went wrong
             }
-            for (int i = 0; i < parameters[0].Length - currentCharIndex; i++)
+            for (int i = 0; i < parameters[0].Length - currentCharIndex; i++) // Loop for the total length of the first parameter minus the currentCharIndex
             {
-                outputTextMesh.text += parameters[0][currentCharIndex + i];
+                outputTextMesh.text += parameters[0][currentCharIndex + i]; // Add the character at currentCharIndex + i to the object's TextMesh's text
             }
             currentCharIndex = 0;
-            smoothTextWaitTime = 0;
-            currentLine++;
+            smoothTextWaitTime = 0; // Set these two variables back to defualt values
+            currentLine++; // Continue to the next line
         }
-        // It could work using a check for 'has x time passed since last character was drawn', however this limits it to one character per frame at max
-        // so it may be smart to add some way for it to add multiple characters per frame since not everyone will be able to run the game at 3000 fps
     }
     #endregion
     #region ManipulateObject
@@ -758,141 +800,187 @@ public class Oyster : MonoBehaviour
         // param: interpolation = string
         // param: time = float
         // param: clickToSkip = bool
+        // param: manipulatePermanent = bool
+        // param: relativeTargetPosition = bool
 
-        if (!modObj_foundObject)
+        if (!modObj_foundObject) // If the object has not been loaded yet
         {
             try
             {
                 modObj_object = GameObject.Find(parameters[0]);
                 modObj_ogPosition = modObj_object.transform.position;
-                modObj_ogRotation = modObj_object.transform.rotation;
+                modObj_ogRotation = modObj_object.transform.eulerAngles;
                 modObj_ogScale = modObj_object.transform.localScale;
                 modObj_foundObject = true;
                 string[] currentParameter;
                 modObj_moving = false;
                 modObj_rotating = false;
                 modObj_scaling = false;
-                modObj_totalTime = 1f;
+                modObj_totalTime = 1f; // Set a comedically large amount of default values
                 modObj_currentTime = 0f;
                 modObj_interpolation = "none";
-                modObj_clickToSkip = false;
-                for (int i = 0; i < parameters.Length - 1; i++)
+                modObj_clickToSkip = true;
+                modObj_relativeTargetPosition = false;
+                modObj_manipulatePermanent = false;
+
+                for (int i = 0; i < parameters.Length - 1; i++) // Loop through all parameters
                 {
-                    currentParameter = parameters[i + 1].Split('=');
-                    switch (currentParameter[0])
+                    currentParameter = parameters[i + 1].Split('='); // Split the current parameter into a name and a value
+                    switch (currentParameter[0]) // Compare the name of the current parameter against the below choices
                     {
-                        default:
-                            Debug.Log("Parameter '" + currentParameter[0] + "' not recognised.");
+                        default: // If the current parameter's name is not recognised
+                            Debug.Log("Parameter '" + currentParameter[0] + "' not recognised."); // Inform the Unity console that the current parameter is not recognised
                             break;
-                        case "moveTo":
-                            modObj_moving = true;
-                            modObj_newPosition = String3Vector(currentParameter[1]);
+                        case "moveTo": // If the current parameter is 'moveTo'
+                            modObj_moving = true; // Set modObj_moving to true
+                            modObj_newPosition = String3Vector(currentParameter[1]); // Set modObj_newPosition to the current parameter's value converted to a Vector3
                             break;
-                        case "rotateTo":
-                            modObj_rotating = true;
-                            modObj_newRotation = Quaternion.Euler(String3Vector(currentParameter[1]));
+                        case "rotateTo": // If the current parameter is 'rotateTo'
+                            modObj_rotating = true; // Set modObj_rotating to true
+                            modObj_newRotation = String3Vector(currentParameter[1]); // Set modObj_newRotation to the current parameter's value converted to a Vector3
                             break;
-                        case "scaleTo":
-                            modObj_scaling = true;
-                            modObj_newScale = String3Vector(currentParameter[1]);
+                        case "scaleTo": // If the current parameter is 'scaleTo'
+                            modObj_scaling = true; // Set modObj_scaling to true
+                            modObj_newScale = String3Vector(currentParameter[1]); // Set modObj_newScale to the current parameter's value converted to a Vector3
                             break;
-                        case "interpolation":
-                            modObj_interpolation = currentParameter[1];
+                        case "interpolation": // If the current parameter is 'interpolation'
+                            modObj_interpolation = currentParameter[1]; // Set modObj_interpolation equal to the current parameter's value
                             break;
-                        case "time":
-                            try
+                        case "time": // If the current parameter is 'time'
+                            try // Attempt to run the below code
                             {
-                                modObj_totalTime = float.Parse(currentParameter[1]);
+                                modObj_totalTime = float.Parse(currentParameter[1]); // Convert and store the current parameter's value as a float
                             }
-                            catch
+                            catch // If the above code fails to run
                             {
-                                Debug.Log("Failed to convert '" + currentParameter[1] + "' to float.");
+                                Debug.Log("Failed to convert '" + currentParameter[1] + "' to float."); // Inform the Unity console that something went wrong
                             }
                             break;
-                        case "clickToSkip":
-                            try
+                        case "clickToSkip": // If the current parameter is 'clickToSkip'
+                            try // Attempt to run the below code
                             {
-                                modObj_clickToSkip = Convert.ToBoolean(currentParameter[1]);
+                                modObj_clickToSkip = Convert.ToBoolean(currentParameter[1]); // Convert and store the current parameter's value as a boolean
                             }
-                            catch
+                            catch // If the above code fails to run
                             {
-                                Debug.Log("Failed to convert '" + currentParameter[1] + "' to boolean.");
+                                Debug.Log("Failed to convert '" + currentParameter[1] + "' to boolean."); // Inform the Unity console that something went wrong
+                            }
+                            break;
+                        case "manipulatePermanent": // If the current parameter is 'manipulatePermanent'
+                            try // Attempt to run the below code
+                            {
+                                modObj_manipulatePermanent = Convert.ToBoolean(currentParameter[1]); // Convert and store the current parameter's value as a boolean
+                            }
+                            catch // If the above code fails to run
+                            {
+                                Debug.Log("Failed to convert '" + currentParameter[1] + "' to boolean."); // Inform the Unity console that something went wrong
+                            }
+                            break;
+                        case "relativeTargetPosition": // If the current parameter is 'relativeTargetPosition'
+                            try // Attempt to run the below code
+                            {
+                                modObj_relativeTargetPosition = Convert.ToBoolean(currentParameter[1]); // Convert and store the current parameter's value as a boolean
+                            }
+                            catch // If the above code fails to run
+                            {
+                                Debug.Log("Failed to convert '" + currentParameter[1] + "' to boolean."); // Inform the Unity console that something went wrong
                             }
                             break;
                     }
                 }
             }
-            catch
+            catch // If the above code fails to run
             {
-                Debug.Log("Unable to find '" + parameters[0] + "' in the current scene.");
-                currentLine++;
+                Debug.Log("Unable to find '" + parameters[0] + "' in the current scene."); // Inform the Unity console that something went wrong
+                currentLine++; // Continue to the next line
             }
         }
-        else
+        else // If the object has been loaded
         {
-            bool done = false;
-            if (modObj_clickToSkip && Input.GetAxis("PrimaryAction") > 0 && !mouseDown)
+            bool done = false; // Set done to a default value
+            if (modObj_clickToSkip && Input.GetAxis("PrimaryAction") > 0 && !mouseDown) // If clickToSkip is true and the mouse is being clicked and the mouse is not being held
             {
-                mouseDown = true;
-                modObj_interpolation = "none";
+                mouseDown = true; // Set mouseDown to true
+                modObj_interpolation = "none"; // Set the interpolation mode to none
             }
-            switch (modObj_interpolation)
+            switch (modObj_interpolation) // Compare the interpolation mode to the below choices
             {
-                default: // No interpolation
-                    done = true;
-                    if (modObj_moving)
+                default: // If the interpolation is not recognised (no interpolation)
+                    done = true; // Set done to true
+                    if (modObj_moving) // If the object is meant to be moving
                     {
-                        done = false;
-                        modObj_object.transform.position = modObj_newPosition;
-                        modObj_moving = false;
+                        done = false; // Set done to false
+                        if (modObj_relativeTargetPosition) // If the position it will be moved to is relative
+                        {
+                            modObj_object.transform.position = modObj_ogPosition + modObj_newPosition; // Set the object's position equal to its own position + its new position
+                        }
+                        else // If the position it will be moved to is non-relative
+                        {
+                            modObj_object.transform.position = modObj_newPosition; // Set the object's position equal to the new position
+                        }
+                        modObj_moving = false; // Set moving to false
                     }
-                    if (modObj_rotating)
+                    if (modObj_rotating) // If the object is meant to be rotating
                     {
-                        done = false;
-                        modObj_object.transform.rotation = modObj_newRotation;
-                        modObj_rotating = false;
+                        done = false; // Set done to false
+                        modObj_object.transform.eulerAngles = modObj_newRotation; // Set the object's rotation to its new rotation
+                        modObj_rotating = false; // Set rotating to false
                     }
-                    if (modObj_scaling)
+                    if (modObj_scaling) // If the object is meant to be scaling
                     {
-                        done = false;
-                        modObj_object.transform.localScale = modObj_newScale;
-                        modObj_scaling = false;
+                        done = false; // Set done to false
+                        modObj_object.transform.localScale = modObj_newScale; // Set the object's scale to its new scale
+                        modObj_scaling = false; // Set scaling to false
                     }
                     break;
-                case "linear":
-                    done = false;
-                    modObj_currentTime += Time.deltaTime;
-                    if (modObj_moving)
+                case "linear": // If the interpolation mode is 'linear'
+                    done = false; // Set done to false
+                    modObj_currentTime += Time.deltaTime; // Add the time between this frame and the previous frame to the currentTime
+                    if (modObj_moving) // If the object is meant to be moving
                     {
-                        modObj_object.transform.position = Vector3.Lerp(modObj_ogPosition, modObj_newPosition, modObj_currentTime/modObj_totalTime);
+                        if (modObj_relativeTargetPosition) // If the movement is supposed to be relative
+                        { // Set the object to a new position that is linearly interpolated between its original position and the new position
+                            modObj_object.transform.position = Vector3.Lerp(modObj_ogPosition, modObj_newPosition + modObj_ogPosition, modObj_currentTime / modObj_totalTime);
+                        }
+                        else // If the movement is not supposed to be relative
+                        { // Set the object to a new position that is linearly interpolated between its original position and the new position
+                            modObj_object.transform.position = Vector3.Lerp(modObj_ogPosition, modObj_newPosition, modObj_currentTime / modObj_totalTime);
+                        }
                     }
-                    if (modObj_rotating)
-                    {
-                        modObj_object.transform.rotation = Quaternion.Lerp(modObj_ogRotation, modObj_newRotation, modObj_currentTime / modObj_totalTime);
+                    if (modObj_rotating) // If the object is meant to be rotating
+                    { // Set the object to a new rotation that is linearly interpolated between its original rotation and the new rotation
+                        modObj_object.transform.rotation = Quaternion.Lerp(Quaternion.Euler(modObj_ogRotation), Quaternion.Euler(modObj_newRotation), modObj_currentTime / modObj_totalTime);
                     }
-                    if (modObj_scaling)
-                    {
+                    if (modObj_scaling) // If the object is meant to be scaling
+                    { // Set the object to a new scale that is linearly interpolated between its original scale and the new scale
                         modObj_object.transform.localScale = Vector3.Lerp(modObj_ogScale, modObj_newScale, modObj_currentTime / modObj_totalTime);
                     }
-                    if (modObj_currentTime >= modObj_totalTime)
+                    if (modObj_currentTime >= modObj_totalTime) // If current time exceeds or is equal to the total time
                     {
-                        done = true;
-                        modObj_currentTime = 0;
+                        done = true; // Set done to true
+                        modObj_currentTime = 0; // Set the currentTime back to 0
                         modObj_moving = false;
-                        modObj_rotating = false;
+                        modObj_rotating = false; // Set all of the object transformation states back to false
                         modObj_scaling = false;
                     }
                     break;
             }
-            if (done)
+            if (done) // IF done
             {
-                modObj_foundObject = false;
-                currentLine++;
+                if (!modObj_manipulatePermanent) // If the movement is not meant to be permanent
+                {
+                    ObjectAndPosition tempObj = new ObjectAndPosition(); // Create a new container for the object and its old transform values
+                    tempObj.gameObject = modObj_object; // Store the object in the container
+                    tempObj.oldState = new Vector3[] { modObj_ogPosition, modObj_ogRotation, modObj_ogScale }; // Store the object's transform values in the container
+                    modObj_objectsToFix.Add(modObj_objectsToFix.Count, tempObj); // Store the container in a dictionary
+                }
+                modObj_foundObject = false; // Reset foundObject
+                currentLine++; // Continue to the next line
             }
         }
     }
     #endregion
-    #region PlayAnimation
+    #region ModifyAnimVariable
     private void ModifyAnimVariable(string[] parameters)
     {
         // Required Parameters:
@@ -900,61 +988,445 @@ public class Oyster : MonoBehaviour
         // param1: variable name
         // param2: variable type
         // param3: variable value
-        if (!playAnim_objectFound)
+        if (!modAnimVar_objectFound) // If the object has not been found
         {
+            try // Attempt to run the below code
+            {
+                modAnimVar_animator = characterObjectsInConversation[parameters[0]].GetComponent<Animator>(); // Find the animator by the first parameter
+                modAnimVar_objectFound = true; // Set objectFound to true
+            }
+            catch // If the above code fails to run
+            {
+                Debug.Log("Unable to load " + parameters[0] + "'s animator."); // Inform the Unity console that something has gone wrong
+                currentLine++; // Continue to the next line
+            }
+        }
+        else // If the object has been found
+        {
+            switch (parameters[2].ToLower()) // Compare the third parameter (converted to lowercase) against the below choices
+            {
+                default: // If the data type is not recognised
+                    Debug.Log("Data type '" + parameters[2] + "' not recognised."); // Inform the Unity console that the data type is not recognised
+                    break;
+                case "float": // If the data type is 'float'
+                    try // Attempt to run the below code
+                    {
+                        float outputFloat = float.Parse(parameters[3]); // Convert the fourth parameter to a float
+                        modAnimVar_animator.SetFloat(parameters[1], outputFloat); // Set the float with name equal to the first parameter equal to the fourth parameter as a float
+                    }
+                    catch // If any of the above code fails to run
+                    {
+                        Debug.Log("Unable to convert '" + parameters[3] + "' to float."); // Inform the Unity console that something has gone wrong
+                    }
+                    break;
+                case "integer": // If the data type is 'integer'
+                    try // Attempt to run the below code
+                    {
+                        int outputInt = Convert.ToInt32(parameters[3]); // Convert the fourth parameter to an integer
+                        modAnimVar_animator.SetInteger(parameters[1], outputInt); // Set the integer with name equal to the first parameter equal to the fourth parameter
+                    }
+                    catch // If any of the above code fails to run
+                    {
+                        Debug.Log("Unable to convert '" + parameters[3] + "' to an integer."); // Inform the Unity console that something went wrong
+                    }
+                    break;
+                case "boolean": // If the data type is 'boolean'
+                    try // Attempt to run the below code
+                    {
+                        bool outputBool = Convert.ToBoolean(parameters[3]); // Convert the fourth parameter to a boolean
+                        modAnimVar_animator.SetBool(parameters[1], outputBool); // Set the boolean with name equal to the first parameter equal to the fourth parameter
+                    }
+                    catch // If any of the above code fails to run
+                    {
+                        Debug.Log("Unable to convert '" + parameters[3] + "' to a boolean."); // Inform the Unity console that something has gone wrong
+                    }
+                    break;
+            }
+            currentLine++; // Continue to the next line
+        }
+    }
+    #endregion
+    #region AddInputField
+    private void AddInputField(string[] parameters) // Function not yet fully implemented
+    {
+        // Required Parameters
+        // param0: object name
+        // param1: output variable name
+        // param2: sprite
+        // param3: position
+        // param4: size
+        // Optional Parameters
+        // param: font = string (file path)
+        // param: fontSize = float
+        // param: characterLimit = integer
+        if (!inpField_created)
+        {
+            TMP_FontAsset font = null;
+            string outputName = parameters[0];
+            Sprite sprite = null;
             try
             {
-                playAnim_animator = characterObjectsInConversation[parameters[0]].GetComponent<Animator>();
-                playAnim_objectFound = true;
+                sprite = loadedSprites[parameters[2]];
             }
             catch
             {
-                Debug.Log("Unable to load " + parameters[0] + "'s animator.");
-                currentLine++;
+                Debug.Log("Sprite '" + parameters[2] + "' not currently loaded.");
             }
+            Vector3 outputPosition = String2Vector(parameters[3]);
+            Vector3 outputSize = String2Vector(parameters[4]);
+            float fontSize = 30;
+            Color fontColour = new Color(0, 0, 0);
+            int characterLimit = 0;
+            for (int i = 0; i < parameters.Length - 5; i++)
+            {
+                string[] currentParameter = parameters[i + 5].Split('=');
+                switch (currentParameter[0])
+                {
+                    default:
+                        Debug.Log("Parameter '" + currentParameter[0] + "' not recognised.");
+                        break;
+                    case "font":
+                        try
+                        {
+                            font = loadedFonts[currentParameter[1]];
+                        }
+                        catch
+                        {
+                            Debug.Log("Font '" + currentParameter[1] + "' not recognised.");
+                        }
+                        break;
+                    case "fontSize":
+                        try
+                        {
+                            fontSize = float.Parse(currentParameter[1]);
+                        }
+                        catch
+                        {
+                            Debug.Log("Unable to convert '" + currentParameter[0] + "' to float.");
+                        }
+                        break;
+                    case "fontColour":
+                        ColorUtility.TryParseHtmlString(currentParameter[1], out fontColour); // Attempt to convert the input colour from hex to rgb
+                        break;
+                    case "characterLimit":
+                        try
+                        {
+                            characterLimit = Convert.ToInt32(currentParameter[1]);
+                        }
+                        catch
+                        {
+                            Debug.Log("Unable to convert '" + currentParameter[0] + "' to an integer.");
+                        }
+                        break;
+                }
+            }
+            // create the text box
+            GameObject output = new GameObject();
+            GameObject outputText = new GameObject();
+            outputText.name = "Text";
+            output.transform.parent = HUD.transform.GetChild(1);
+            outputText.transform.parent = output.transform;
+            TextMeshProUGUI outputTextTextMesh = outputText.AddComponent<TextMeshProUGUI>();
+            TMP_InputField outputInputField = output.AddComponent<TMP_InputField>();
+            RectTransform outputRectTransform = output.AddComponent<RectTransform>();
+            Image outputImage = output.AddComponent<Image>();
+            RectTransform outputTextRectTransform = outputText.GetComponent<RectTransform>();
+
+            if (font != null)
+            {
+                outputTextTextMesh.font = font;
+            }
+            if (sprite != null)
+            {
+                outputImage.sprite = sprite;
+            }
+            output.name = outputName;
+            outputInputField.textComponent = outputTextTextMesh;
+            outputInputField.characterLimit = characterLimit;
+            outputTextTextMesh.fontSize = fontSize;
+            outputTextTextMesh.color = fontColour;
+            outputInputField.targetGraphic = outputImage;
+            outputTextRectTransform.localScale = new Vector3(1, 1, 1);
+            outputRectTransform.localScale = new Vector3(1, 1, 1);
+            outputTextRectTransform.sizeDelta = outputSize;
+            outputRectTransform.sizeDelta = outputSize;
+            outputRectTransform.anchoredPosition = new Vector2((outputPosition.x - 960) + outputSize.x / 2, (540 - outputPosition.y) - outputSize.y / 2);
+            inpField_created = true;
+            outputInputField.onSubmit.AddListener(OnInputSubmit);
+            tempParams = parameters;
+            inpField_output = output;
         }
         else
         {
-            switch (parameters[2].ToLower())
+            if (inpField_textInput != null)
             {
-                default:
-                    Debug.Log("Data type '" + parameters[2] + "' not recognised.");
-                    break;
-                case "float":
-                    try
-                    {
-                        float outputFloat = float.Parse(parameters[3]);
-                        playAnim_animator.SetFloat(parameters[1], outputFloat);
-                    }
-                    catch
-                    {
-                        Debug.Log("Unable to convert '" + parameters[3] + "' to float.");
-                    }
-                    break;
-                case "integer":
-                    try
-                    {
-                        int outputInt = Convert.ToInt32(parameters[3]);
-                        playAnim_animator.SetInteger(parameters[1], outputInt);
-                    }
-                    catch
-                    {
-                        Debug.Log("Unable to convert '" + parameters[3] + "' to an integer.");
-                    }
-                    break;
-                case "boolean":
-                    try
-                    {
-                        bool outputBool = Convert.ToBoolean(parameters[3]);
-                        playAnim_animator.SetBool(parameters[1], outputBool);
-                    }
-                    catch
-                    {
-                        Debug.Log("Unable to convert '" + parameters[3] + "' to a boolean.");
-                    }
-                    break;
+                conversationStrings.Add(parameters[1], inpField_textInput);
+                Destroy(inpField_output);
+                inpField_output = null;
+                inpField_textInput = null;
+                inpField_created = false;
+                tempParams = null;
+                currentLine++;
+                // Known issues
+                // - on second conversation with same box, box does not get destroyed on text submission < - fixed this one, but made it harder for external variable storage
+                // - no methods can actually access the variables that this method outputs < - maybe some form of function to store variable in JSON as well?
             }
         }
+    }
+    #endregion
+    #region LoadFont
+    private void LoadFont(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: FontName
+        // param1: FontPath
+        switch (fontLoaded)
+        {
+            case 0:
+                AsyncOperationHandle<TMP_FontAsset> fontHandle = Addressables.LoadAssetAsync<TMP_FontAsset>("Assets/Oyster/Fonts/" + parameters[1]);
+                fontHandle.Completed += FontHandle_Completed;
+                fontLoaded = 1;
+                tempParams = parameters;
+                break;
+            case 2:
+                if (loadedFont != null)
+                {
+                    loadedFonts.Add(parameters[0], loadedFont);
+                }
+                else
+                {
+                    Debug.Log("Unable to add font to 'loadedFonts' as 'loadedFont' is null!");
+                }
+                tempParams = null;
+                loadedFont = null;
+                fontLoaded = 0;
+                currentLine++;
+                break;
+        }
+    }
+    #endregion
+    #region LoadSprite
+    private void LoadSprite(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: SpriteName
+        // param1: SpritePath
+        switch (spriteLoaded)
+        {
+            case 0:
+                AsyncOperationHandle<Sprite> spriteHandle = Addressables.LoadAssetAsync<Sprite>("Assets/Oyster/Sprites/" + parameters[1]);
+                spriteHandle.Completed += SpriteHandle_Completed;
+                spriteLoaded = 1;
+                tempParams = parameters;
+                break;
+            case 2:
+                if (loadedSprite != null)
+                {
+                    loadedSprites.Add(parameters[0], loadedSprite);
+                }
+                else
+                {
+                    Debug.Log("Unable to add sprite to 'loadedSprites' as 'loadedSprite' is null!");
+                }
+                tempParams = null;
+                loadedSprite = null;
+                spriteLoaded = 0;
+                currentLine++;
+                break;
+        }
+    }
+    #endregion
+    #region LegacyPlayAnimation
+    private void LegacyPlayAnimation(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: object name
+        // param1: animation name
+        // Optional Parameters:
+        // param: waitOnAnim = bool
+        // param: ignoreAnimator = bool
+        switch (legacyPlayAnim_animState)
+        {
+            case 0:
+                // no anim playing, first loop
+                try
+                {
+                    legacyPlayAnim_waitOnAnim = false;
+                    bool ignoreAnimator = false;
+                    // loop through optional parameters
+                    for (int i = 0; i < parameters.Length - 2; i++)
+                    {
+                        string[] currentParameter = parameters[i + 2].Split('=');
+                        switch (currentParameter[0])
+                        {
+                            default:
+                                Debug.Log("Parameter '" + currentParameter[0] + "' not recognised.");
+                                break;
+                            case "waitOnAnim":
+                                try
+                                {
+                                    legacyPlayAnim_waitOnAnim = Convert.ToBoolean(currentParameter[1]);
+                                }
+                                catch
+                                {
+                                    Debug.Log("Unable to convert '" + currentParameter[0] + "' to boolean.");
+                                }
+                                break;
+                            case "ignoreAnimator":
+                                try
+                                {
+                                    ignoreAnimator = Convert.ToBoolean(currentParameter[1]);
+                                }
+                                catch
+                                {
+                                    Debug.Log("Unable to convert '" + currentParameter[0] + "' to boolean.");
+                                }
+                                break;
+                        }
+                    }
+                    GameObject target = GameObject.Find(parameters[0]);
+                    try // Check for animator, this is expected to fail
+                    {
+                        if (!ignoreAnimator)
+                        {
+                            target.GetComponent<Animator>();
+                            currentLine++; // If it has animator then pass on running this function
+                            Debug.Log("Target object has animator! Set the flag 'ignoreAnimator' to continue animating this object.");
+                        }
+                    }
+                    catch // This is where the main function happens
+                    {
+                        // If it does not have animator then continue
+                    }
+                    try
+                    {
+                        // play animation
+                        legacyPlayAnim_targetAnimation = target.GetComponent<Animation>();
+                        legacyPlayAnim_targetAnimation.Play(parameters[1]);
+                        legacyPlayAnim_animState = 2;
+                        Debug.Log("poggers");
+                    }
+                    catch
+                    {
+                        // animation does not exist
+                        Debug.Log("Object is either missing animation component or animation clip does not exist.");
+                        currentLine++;
+                    }
+                }
+                catch
+                {
+                    Debug.Log("Game object '" + parameters[0] + "' either does not exist in the current scene or lacks an animation component.");
+                    currentLine++;
+                }
+                break;
+            case 2:
+                // anim playing && not waiting || anim finished playing & waiting
+                if (!legacyPlayAnim_waitOnAnim || legacyPlayAnim_waitOnAnim && !legacyPlayAnim_targetAnimation.IsPlaying(parameters[1]))
+                {
+                    Debug.Log("anim finished");
+                    currentLine++;
+                }
+                break;
+        }
+    }
+    #endregion
+    #region PlayAnimation
+    private void PlayAnimation(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: object name
+        // param1: animation name
+        // Optional Parameters:
+        // param: layerName = string
+        // param: waitOnAnim = boolean
+        switch (playAnim_animState)
+        {
+            case 0: // first loop
+                try
+                {
+                    playAnim_targetAnimator = GameObject.Find(parameters[0]).GetComponent<Animator>();
+                    playAnim_animState = 2;
+                    playAnim_layerName = "Cutscene";
+                    playAnim_waitOnAnim = true;
+                    playAnim_animName = parameters[1];
+                    for (int i = 0; i < parameters.Length - 2; i++)
+                    {
+                        string[] currentParameter = parameters[i + 2].Split('=');
+                        switch (currentParameter[0])
+                        {
+                            default:
+                                Debug.Log("Parameter '" + currentParameter[0] + "' not recognised.");
+                                break;
+                            case "waitOnAnim":
+                                try
+                                {
+                                    playAnim_waitOnAnim = Convert.ToBoolean(currentParameter[1]);
+                                }
+                                catch
+                                {
+                                    Debug.Log("Unable to convert '" + currentParameter[0] + "' to boolean.");
+                                }
+                                break;
+                            case "layerName":
+                                playAnim_layerName = currentParameter[1];
+                                break;
+                        }
+                    }
+                    try
+                    {
+                        playAnim_targetAnimator.Play(playAnim_layerName + "." + parameters[1]);
+                        playAnim_animState = 2;
+                    }
+                    catch
+                    {
+                        Debug.Log("Animator '" + parameters[0] + "' does not contain animation '" + playAnim_layerName + "." + parameters[1] + "'.");
+                        currentLine++;
+                    }
+                }
+                catch
+                {
+                    Debug.Log("Object '" + parameters[0] + "' does not contain an animator.");
+                    currentLine++;
+                }
+                break;
+            case 2: // !animation playing && waiting || !waiting
+                bool finished = false;
+                Debug.Log(playAnim_targetAnimator.GetCurrentAnimatorStateInfo(playAnim_targetAnimator.GetLayerIndex(playAnim_layerName)).normalizedTime); // 0.99 on line below as normalizedTime never quite reaches 1 on the same frame this checks
+                if (playAnim_targetAnimator.GetCurrentAnimatorStateInfo(playAnim_targetAnimator.GetLayerIndex(playAnim_layerName)).normalizedTime >= 0.99) // There's surely a better way to check when an animation has finished?
+                {
+                    finished = true;
+                    Debug.Log("good");
+                }
+                if (!playAnim_waitOnAnim || playAnim_waitOnAnim && finished)
+                {
+                    playAnim_targetAnimator = GameObject.Find(parameters[0]).GetComponent<Animator>();
+                    playAnim_animState = 0;
+                    playAnim_layerName = "Cutscene";
+                    playAnim_waitOnAnim = true;
+                    playAnim_animName = null;
+                    currentLine++;
+                }
+                break;
+        }
+    }
+    #endregion
+    #region SetAnimLayerWeight
+    private void SetAnimLayerWeight(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: object name
+        // param1: Layer Name
+        // param2: Layer Weight
+        try
+        {
+            Animator targetAnimator = GameObject.Find(parameters[0]).GetComponent<Animator>();
+            targetAnimator.SetLayerWeight(targetAnimator.GetLayerIndex(parameters[1]), float.Parse(parameters[2]));
+        }
+        catch
+        {
+            Debug.Log("Failed to set weight of layer '" + parameters[1] + "' to value '" + parameters[2] + "'.");
+        }
+        currentLine++;
     }
     #endregion
     #endregion
@@ -989,6 +1461,10 @@ public class Oyster : MonoBehaviour
                         break;
                 }
                 tempString += chr; // Add the current character to tempString
+            }
+            if (readingValue == 0)
+            {
+                throw new InvalidDataException();
             }
         }
         catch // If any of the above code fails to run
@@ -1039,6 +1515,10 @@ public class Oyster : MonoBehaviour
                 }
                 tempString += chr; // Add the current character to tempString
             }
+            if (readingValue == 0)
+            {
+                throw new InvalidDataException();
+            }
         }
         catch // If any of the above code fails to run
         {
@@ -1051,7 +1531,7 @@ public class Oyster : MonoBehaviour
     }
     private void CleanupSpeech() // Destroys all objects and addressables created by a script
     {
-        foreach(string str in gameObjectsNames) // Loops through each entry in gameOBjectsNames
+        foreach (string str in gameObjectsNames) // Loops through each entry in gameOBjectsNames
         {
             try // Attempts to find and destroy a gameObject
             {
@@ -1067,7 +1547,7 @@ public class Oyster : MonoBehaviour
         {
             try // Attempt to unload the loaded addressable from the current index
             {
-                Addressables.Release(loadedAddressables[i.ToString()]);
+                Addressables.Release(loadedAddressables[i]);
                 Debug.Log("Unloaded addressable successfully!"); // Inform the Unity console that it succeeded
             }
             catch // If it fails to unload an addressable
@@ -1075,11 +1555,22 @@ public class Oyster : MonoBehaviour
                 Debug.Log("Failed to release addressable!"); // Inform the Unity console that it failed
             }
         }
-        loadedAddressables = new Dictionary<string, AsyncOperationHandle>();
+        for (int i = 0; i < modObj_objectsToFix.Count; i++) // Loop through all objects that need moving back to their original positions
+        {
+            int c = modObj_objectsToFix.Count - 1 - i; // Calculate an index such that the dictionary is read back to front
+            modObj_objectsToFix[c].gameObject.transform.position = modObj_objectsToFix[c].oldState[0];
+            modObj_objectsToFix[c].gameObject.transform.eulerAngles = modObj_objectsToFix[c].oldState[1]; // Restore the object's transform values back to the values stored in the dictionary
+            modObj_objectsToFix[c].gameObject.transform.localScale = modObj_objectsToFix[c].oldState[2];
+        }
+        loadedAddressables = new Dictionary<int, AsyncOperationHandle>();
         gameObjectsNames = new List<string>(); // Reset the object and handle trackers to being null for when another script is ran
         speechCooldown = speechCooldownTime; // Set the speechCooldown to the provided time, so that a speech cannot be instantly started after this one. Useful for if the previous speech finished with a click event
         charactersInConversation = new Dictionary<string, CharacterData>();
-        characterObjectsInConversation = new Dictionary<string, GameObject>();
+        characterObjectsInConversation = new Dictionary<string, GameObject>(); // Reset some Dictionaries to be empty again
+        modObj_objectsToFix = new Dictionary<int, ObjectAndPosition>();
+        loadedFonts = new Dictionary<string, TMP_FontAsset>();
+        loadedSprites = new Dictionary<string, Sprite>();
+        conversationStrings = new Dictionary<string, string>();
     }
     #endregion
 }
