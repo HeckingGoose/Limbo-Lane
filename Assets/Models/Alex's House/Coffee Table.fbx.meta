@@ -1,23 +1,19 @@
 fileFormatVersion: 2
-guid: d4959faaf884da846ad461314c6955f2
+guid: cb681e1e3993f344aac5854c75b76739
 ModelImporter:
   serializedVersion: 20200
-  internalIDToNameTable:
-  - first:
-      74: 5112566885385518876
-    second: Armature|Door_Closed
-  - first:
-      74: 7051517125472779756
-    second: Armature|Door_Open
-  - first:
-      74: -9107468632971710947
-    second: Armature|Door_OpenFromClosed
+  internalIDToNameTable: []
   externalObjects:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Interior
-    second: {fileID: 2100000, guid: 1feebe3fe60f6e44ba66730af6a3de91, type: 2}
+      name: Table_Glass
+    second: {fileID: 2100000, guid: edc62ddda87785545981df829a5aec16, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Table_Leg
+    second: {fileID: 2100000, guid: edc62ddda87785545981df829a5aec16, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
@@ -48,7 +44,7 @@ ModelImporter:
     isReadable: 0
   meshes:
     lODScreenPercentages: []
-    globalScale: 0.1
+    globalScale: 0.75
     meshCompression: 0
     addColliders: 0
     useSRGBMaterialColor: 1
@@ -99,7 +95,7 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
-    globalScale: 0.1
+    globalScale: 0.75
     rootMotionBoneName: 
     hasTranslationDoF: 0
     hasExtraRoot: 0

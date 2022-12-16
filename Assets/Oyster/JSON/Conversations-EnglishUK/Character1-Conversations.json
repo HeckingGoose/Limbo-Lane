@@ -1,0 +1,19 @@
+{
+  "container": [
+    {
+      "title": "Alex_WalkIntoHouse",
+      "scriptVersion": "3.0.0",
+      "commands": [
+        "AddCharacter; Alex",
+        "SetAnimLayerWeight; Alex; Cutscene; 1",
+        "SetAnimLayerWeight; 'House Interior'; Cutscene; 1",
+        "PlayAnimation; 'House Interior'; 'Door Opening'; waitOnAnim = false",
+        "PlayAnimation; Alex; WalkThroughDoor; waitOnAnim = false",
+        "ManipulateObject; Alex; moveTo = (1.934, 0, -0.583); interpolation = linear; time = 1.75; manipulatePermanent = true",
+        "ManipulateObject; Alex; moveTo = (1.493, 0, 1.38); rotateTo = (0, -50.64, 0); interpolation = linear; time = 1; manipulatePermanent = true",
+        "ManipulateObject; Alex; moveTo = (0.307, 0, 1.903); rotateTo = (0, -76.3, 0); interpolation = linear; time = 1; manipulatePermanent = true",
+        "EndConversation"
+      ]
+    }
+  ]
+}
