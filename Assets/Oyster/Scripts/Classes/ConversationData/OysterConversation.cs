@@ -4,12 +4,12 @@ public class OysterConversation
     public string title;
     public string scriptVersion; // Variables that are stored within this class
     public string[] commands;
-    public static OysterConversation Create(string _title, string _scriptVersion, string[] _commands) // Constructor so that Unity knows what variables actually make up the class
+    public static OysterConversation Create(string title, string scriptVersion, string[] commands) // Constructor so that Unity knows what variables actually make up the class
     {
         OysterConversation conversation = new OysterConversation();
-        conversation.title = _title;
-        conversation.scriptVersion = _scriptVersion; // Creating and returning an instance of itself
-        conversation.commands = _commands;
+        conversation.title = title;
+        conversation.scriptVersion = scriptVersion; // Creating and returning an instance of itself
+        conversation.commands = commands;
         return conversation;
     }
 }

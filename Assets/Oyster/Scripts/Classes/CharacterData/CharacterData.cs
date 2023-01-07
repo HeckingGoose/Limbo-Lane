@@ -5,12 +5,12 @@ public class CharacterData
     public string altName; // Define variables that make up the class
     public string colour;
 
-    public static CharacterData Create(string _name, string _altName, string _colour) // Tell Unity which variables make up the class
+    public static CharacterData Create(string name, string altName, string colour) // Tell Unity which variables make up the class
     {
         CharacterData data = new CharacterData();
-        data.name = _name; // Create and return an instance of itself
-        data.altName = _altName;
-        data.colour = _colour;
+        data.name = name; // Create and return an instance of itself
+        data.altName = altName;
+        data.colour = colour;
         return data;
     }
 }

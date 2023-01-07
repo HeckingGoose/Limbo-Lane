@@ -1,4 +1,3 @@
-using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,6 +5,7 @@ using TMPro;
 using UnityEngine; // Link required assemblies
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class Oyster : MonoBehaviour
@@ -17,30 +17,34 @@ public class Oyster : MonoBehaviour
     private string language = "EnglishUK"; // Language variable that can potentially be changed to allow for multi-language support (too bad I only speak one language :\)
     #endregion
     #region Conversation Variables
-    // These variables need to be cleaned up a bit, maybe create a fontLoader that can be called seperately to load fonts, and make classes to store the variables for each function
+    // These variables need to be cleaned up a bit, maybe make classes to store the variables for each function
     #region Generic
+    private bool versionDataLoaded = false;
     [SerializeField] // SerializeField allows the variable to be viewable within the Unity editor without exposing it to every other script
     private float speechCooldownTime = 2;
     [SerializeField]
-    private int maxLinesPerFrame = 5; // variable intended to limit how many lines Oyster can process per frame - unlike in version 2 where only 1 line was processed per frame
+    private SceneStateLoader sceneStateLoader;
+    private int maxLinesPerFrame; // variable intended to limit how many lines Oyster can process per frame - unlike in version 2 where only 1 line was processed per frame
     private int characterIndex;
-    private int conversationIndex; // Setup variables required for conversation stuffs
+    private string conversationName; // Setup variables required for conversation stuffs
     private int currentLine;
     private TextAsset conversationData;
     private OysterConversationsContainer conversations;
     private OysterConversation currentConversation;
+    [HideInInspector]
     public bool inConversation = false; // true when a conversation is in progress
     private string scriptVersion = "?"; // default value so that if a check is made against this variables before Oyster is loaded, the script does not crash
     private string[] tempParams;
     private bool mouseDown;
     private float speechCooldown = 0;
     private float failedReadAttempts = 0;
-    private List<String> gameObjectsNames = new List<String>();
+    private Dictionary<string, GameObject> createdObjects = new Dictionary<string, GameObject>();
     private CharacterDataContainer characters;
     private bool charactersLoaded = false;
     private Dictionary<string, CharacterData> charactersInConversation = new Dictionary<string, CharacterData>();
     private Dictionary<string, GameObject> characterObjectsInConversation = new Dictionary<string, GameObject>();
     private Dictionary<string, string> conversationStrings = new Dictionary<string, string>();
+    private bool waiting = false;
     #endregion
     #region WaitForInput
     private float waitingTime = 0;
@@ -50,14 +54,14 @@ public class Oyster : MonoBehaviour
     #region AddSmoothText
     private int charactersPerSecond = 2;
     private float smoothTextWaitTime = 0;
-    private int currentCharIndex = 0;
+    private int currentCharIndex = 0; // Variables for the AddSmoothText function
     #endregion
     #region ModifyObject
     private GameObject modObj_object;
     private bool modObj_foundObject = false;
     private bool modObj_moving;
     private bool modObj_rotating;
-    private bool modObj_scaling;
+    private bool modObj_scaling; // Variables for the ManipulateObject function
     private bool modObj_clickToSkip;
     private bool modObj_manipulatePermanent;
     private bool modObj_relativeTargetPosition;
@@ -90,8 +94,30 @@ public class Oyster : MonoBehaviour
     #endregion
     #region AddInputField
     private bool inpField_created = false;
-    private string inpField_textInput = null;
+    private string inpField_textInput = null; // There are a lot of variables here, I should really consider trying to reduce the amount of variables
     private GameObject inpField_output;
+    #endregion
+    #region ModCamFOV
+    private int modFOV_state;
+    private float modFOV_time;
+    private Camera modFOV_camera;
+    private string modFOV_interpolation;
+    private float modFOV_targetFOV;
+    private float modFOV_ogFOV;
+    private float modFOV_currentTime;
+    private bool modFOV_permanent;
+    private bool modFOV_clickToSkip;
+    private Dictionary<int, CameraAndFOV> modFOV_camerasToFix = new Dictionary<int, CameraAndFOV>();
+    #endregion
+    #region ManipulateImage
+    private Image manipImg_image;
+    private float manipImg_time;
+    private float manipImg_currentTime;
+    private string manipImg_interpolation;
+    private float manipImg_transparency;
+    private bool manipImg_modTransparency;
+    private float manipImg_ogTransparency;
+    private int manipImg_state = 0;
     #endregion
     #region LineMarkers
     [SerializeField]
@@ -127,9 +153,9 @@ public class Oyster : MonoBehaviour
     private void Update()
     {
         #region Jump back into conversation
-        if (inConversation) // If a conversation is currently taking place
+        if (inConversation || waiting) // If a conversation is currently taking place
         {
-            Speak(characterIndex, conversationIndex, currentLine); // Then push the script back into the conversation
+            Speak(characterIndex, conversationName, currentLine); // Then push the script back into the conversation
         }
         #endregion
         #region Handle whether mouse is being held or ¬
@@ -149,19 +175,42 @@ public class Oyster : MonoBehaviour
         }
         #endregion
     }
-    public void Speak(int _characterIndex, int _conversationIndex, int _currentLine) // The main method, this exists to interpret Oyster script files and pass commands and parameters to the correct methods
+    public void Speak(int _characterIndex, string _conversationName, int _currentLine) // The main method, this exists to interpret Oyster script files and pass commands and parameters to the correct methods
     {
         #region Pre-conversation setup
-        if (!inConversation) // If this is a new conversation
+        if (!inConversation)
+        {
+            waiting = true;
+            characterIndex = _characterIndex;
+            conversationName = _conversationName; // Store internal method variables in a bit more of a global scope for later re-entry
+            currentLine = _currentLine;
+        }
+        if (!inConversation && versionDataLoaded) // If this is a new conversation
         {
             if (speechCooldown <= 0)
             {
+                waiting = false;
+                if (PersistentVariables.charactersPerSecond != 0)
+                {
+                    charactersPerSecond = PersistentVariables.charactersPerSecond;
+                }
+                else
+                {
+                    Debug.Log("Characters per second not set, defaulting to 2!");
+                }
+                try // Try to run the below code
+                {
+                    string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments); // Define the documents path
+                    maxLinesPerFrame = JsonUtility.FromJson<Options>(File.ReadAllText(documentsPath + @"\My Games\LimboLane\options.json")).linesPerFrame; // Read the max lines per frame from the settings file
+                }
+                catch
+                {
+                    Debug.Log("Unable to load linesPerFrame from options.json, defaulting to 5."); // Inform the Unity console that something went wrong
+                    maxLinesPerFrame = 5; // Set max lines per frame to a default value
+                }
                 inConversation = true; // Set inConversation to true so that on next entry the method knows a conversation is underway
                 AsyncOperationHandle<TextAsset> conversationDataHandle = Addressables.LoadAssetAsync<TextAsset>("Assets/Oyster/JSON/Conversations-" + language + "/Character" + _characterIndex.ToString() + "-Conversations.json"); // Begin loading the required conversation, with multiple language support. Nifty
                 conversationDataHandle.Completed += ConversationHandle_Completed; // Tell the asset loader to start the listed method when in finishes
-                characterIndex = _characterIndex;
-                conversationIndex = _conversationIndex; // Store internal method variables in a bit more of a global scope for later re-entry
-                currentLine = _currentLine;
             }
         }
         #endregion
@@ -273,6 +322,29 @@ public class Oyster : MonoBehaviour
                         case "EndConversation": // Calls the EndConversation method when the command EndConversation is read
                             EndConversation(currentLineParameters);
                             break;
+                        case "DelObject": // Calls the DelObject method when the command DelObject is read
+                            DelObject(currentLineParameters);
+                            break;
+                        case "ModifySprite": // Calls the ModifySprite method when the command ModifySprite is read
+                            ModifySprite(currentLineParameters);
+                            break;
+                        case "ModCamFOV": // Calls the ModCamFOV method when the command ModCamFOV is read
+                            if (!lineAlreadyProcessed) // Limits this command to running once per frame as it relies on deltatime
+                            {
+                                lineAlreadyProcessed = true;
+                                ModCamFOV(currentLineParameters);
+                            }
+                            break;
+                        case "ManipulateImage": // Calls the ManipulateImage method when the command ManipulateImage is read
+                            if (!lineAlreadyProcessed) // Limits this command to running once per frame as it relies on deltatime
+                            {
+                                lineAlreadyProcessed = true;
+                                ManipulateImage(currentLineParameters);
+                            }
+                            break;
+                        case "LoadScene": // Calls the LoadScene method when the command LoadScene is read
+                            LoadScene(currentLineParameters);
+                            break;
                     }
                     failedReadAttempts = 0; // Resets the total failures of this try statement to 0
                 }
@@ -368,18 +440,34 @@ public class Oyster : MonoBehaviour
         {
             conversationData = handle.Result; // Stores the result of handle in conversationData
             conversations = JsonUtility.FromJson<OysterConversationsContainer>(conversationData.text); // Convert the loaded asset into a usable class
-            currentConversation = conversations.container[conversationIndex]; // Set currentconversation equal to the conversation currently scored in conversations that matches the index conversationIndex
-            SetupLineMarkers(currentConversation); // Call a method to setup line markers
-            if (currentConversation.scriptVersion != scriptVersion) // If script versions do not match
+            //currentConversation = conversations.container[conversationIndex]; // Set currentconversation equal to the conversation currently scored in conversations that matches the index conversationIndex
+            currentConversation = null;
+            for (int i = 0; i < conversations.container.Length; i++) // Loops through every conversation in the loaded file
             {
-                Debug.Log("Script versions do not match! Some commands in this script may not be recognised."); // Tell the Unity console that issues may occur as the script versions do not match
+                if (conversationName == conversations.container[i].title) // If the conversation name matches that of the requested conversation
+                {
+                    currentConversation = conversations.container[i]; // Set the current conversation equal to that conversation
+                }
             }
-            else // If script versions match
+            if (currentConversation == null) // If no conversation was loaded
             {
-                Debug.Log("Conversation " + currentConversation.title + " loaded without any errors."); // Tell the Unity console to output that the conversation loaded with no errors
+                Debug.Log("Unable to find conversation."); // Inform the Unity console that no conversation could be loaded
+                inConversation = false; // Leave the conversation
             }
-            Addressables.Release(handle); // Removes the asset Character#-Conversations.json from memory
-            Speak(characterIndex, conversationIndex, currentLine); // Calls the speak method again, so that the method now continues since the required data has been loaded
+            else // If a conversation was loaded
+            {
+                SetupLineMarkers(currentConversation); // Call a method to setup line markers
+                if (currentConversation.scriptVersion != scriptVersion) // If script versions do not match
+                {
+                    Debug.Log("Script versions do not match! Some commands in this script may not be recognised."); // Tell the Unity console that issues may occur as the script versions do not match
+                }
+                else // If script versions match
+                {
+                    Debug.Log("Conversation " + currentConversation.title + " loaded without any errors."); // Tell the Unity console to output that the conversation loaded with no errors
+                }
+                Addressables.Release(handle); // Removes the asset Character#-Conversations.json from memory
+                Speak(characterIndex, conversationName, currentLine); // Calls the speak method again, so that the method now continues since the required data has been loaded
+            }
         }
         else // If the asset failed to load
         {
@@ -401,6 +489,7 @@ public class Oyster : MonoBehaviour
             Debug.Log("Version data failed to load"); // Relays an error to the Unity console stating that the asset failed to load
             Addressables.Release(handle); // Removes the asset Version.json from memory
         }
+        versionDataLoaded = true;
     }
     private void DisplayVersionData(TextAsset versionDataAsset) // Displays the current version of Oyster to the Unity console
     {
@@ -419,13 +508,25 @@ public class Oyster : MonoBehaviour
         // param2: position
         // Optional Parameters:
         // param: spriteIsCool = bool
+        // param: size = vector2
+        // param: colour = HTML colour
+        // param: sort order = string
+        // param: alpha = float
         try
         {
-            Sprite sprite = loadedSprites[parameters[1]]; // Set the variable sprite equal to a loadedSprite
+            Sprite sprite = null;
+            if (parameters[1] != "null")
+            {
+                sprite = loadedSprites[parameters[1]]; // Set the variable sprite equal to a loadedSprite
+            }
             loadedSprite = null; // Set loadedSprite to null for when this method is called again
             string name = parameters[0]; // Set the variable name equal to the first parameter
             Vector2 position = String2Vector(parameters[2]); // Translate the fourth parameter into the sprite's on-screen position
             Vector2 size = new Vector2(100, 100); // Set the variable size equal to a default value
+            Color colour = new Color(255,255,255,255);
+            float alpha = 255;
+            string sort = "main";
+            string anchor = "centre";
             try // Try to run the below code
             {
                 size = new Vector2(sprite.rect.width, sprite.rect.height); // Attempt to set the size equal to the width and height of the sprite
@@ -436,12 +537,12 @@ public class Oyster : MonoBehaviour
             }
             //Define optional parameter default values
             bool spriteIsCool = false; // Testing variable that I will likely keep in just for testing purposes
-            if (parameters.Length > 4)
+            if (parameters.Length > 3)
             {
                 string[] currentParameter;
-                for (int i = 0; i < parameters.Length - 4; i++) // Loop through all optional parameters
+                for (int i = 0; i < parameters.Length - 3; i++) // Loop through all optional parameters
                 {
-                    currentParameter = parameters[4 + i].Split('='); // split the optional parameter into a name and a data value
+                    currentParameter = parameters[3 + i].Split('='); // split the optional parameter into a name and a data value
                     switch (currentParameter[0])
                     {
                         default:
@@ -457,25 +558,81 @@ public class Oyster : MonoBehaviour
                                 Debug.Log("Failed to convert spriteIsCool input to bool, skipping value..."); // Inform the Unity console that the value of spriteIsCool could not be loaded
                             }
                             break;
+                        case "size": // If the parameter is 'size'
+                            size = String2Vector(currentParameter[1]); // Set size equal to the current parameter converted to a vector2
+                            break;
+                        case "anchor": // If the parameter is 'anchor'
+                            anchor = currentParameter[1]; // Set the anchor equal to the current parameter
+                            break;
+                        case "colour": // If the parameter is 'colour'
+                            ColorUtility.TryParseHtmlString(currentParameter[1], out colour); // Set the colour equal to the current parameter as a colour
+                            break;
+                        case "sort": // If the parameter is 'sort'
+                            sort = currentParameter[1]; // Set sort equal to the current parameter
+                            break;
+                        case "alpha": // If the parameter is 'alpha'
+                            try // Try to run the below code
+                            {
+                                alpha = float.Parse(currentParameter[1]); // Convert the current parameter to float and store it as alpha
+                                alpha = Mathf.Clamp(alpha, 0, 1); // Clamp alpha beween 0 and 1
+                            }
+                            catch // If the above code failed to run
+                            {
+                                Debug.Log("Unable to convert '" + currentParameter[1] + "'"); // Inform the Unity console that something went wrong
+                            }
+                            break;
+
                     }
                 }
             }
-            Vector2 drawPosition = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Since sprites and the canvas have (0,0) to be their centre, do a little maths to figure out where the draw position should be for (0,0) to be the top left
+            if (anchor == "topLeft") // If the anchor is topleft
+            {
+                position = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Since sprites and the canvas have (0,0) to be their centre, do a little maths to figure out where the draw position should be for (0,0) to be the top left
+            }
             GameObject output = new GameObject(); // Create a new gameobject
             output.name = name; // Set it's name equal to the name given in the method's parameters
-            output.transform.parent = HUD.transform.GetChild(0); // Make the object a child of the HUD's child object 'Sprites'
+            switch (sort.ToLower())
+            {
+                default:
+                    output.transform.parent = HUD.transform.GetChild(0); // Make the object a child of the HUD's child object 'Sprites'
+                    break;
+                case "overlay":
+                    output.transform.parent = HUD.transform.GetChild(2); // Make the object a child of the HUD's child object 'Overlay'
+                    break;
+            }
             RectTransform outputRectTransform = output.AddComponent<RectTransform>(); // Add a RectTransform to the object
             outputRectTransform.localScale = new Vector3(1, 1, 1); // Set it's scale to 1, since when making the object it's scale sometimes becomes more than 1 for some unknown reason
-            outputRectTransform.anchoredPosition = drawPosition; // Move the object to it's correct position
+            outputRectTransform.anchoredPosition = position; // Move the object to it's correct position
             outputRectTransform.sizeDelta = size; // Scale the object's dimensions to fit the sprite
             output.AddComponent<CanvasRenderer>(); // Add a CanvasRenderer component so that the object is rendered to the HUD
-            UnityEngine.UI.Image outputImage = output.AddComponent<UnityEngine.UI.Image>(); // Add an Image component to the object
+            Image outputImage = output.AddComponent<Image>(); // Add an Image component to the object
+            colour = new Color(colour.r, colour.g, colour.b, alpha); // Incorporate the specified alpha into the input colour
+            outputImage.color = colour; // Set the output colour to the colour calculated above
             outputImage.sprite = sprite; // Set the sprite value of the Image component equal to the loaded sprite
-            gameObjectsNames.Add(name); // Add this object to the list of loaded objects
+            createdObjects.Add(name, output); // Add this object to the list of loaded objects
         }
-        catch
+        catch // If something goes wrong
         {
-            Debug.Log("Sprite '" + parameters[1] + "' not currently loaded.");
+            Debug.Log("Sprite '" + parameters[1] + "' not currently loaded."); // Inform the Unity console that that sprite is not currently loaded
+        }
+        currentLine++; // Continue to the next line
+    }
+    #endregion
+    #region DelObject
+    private void DelObject(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: object name
+        // Optional Parameters:
+        // none
+        try // Try to run the below code
+        {
+            GameObject.Destroy(createdObjects[parameters[0]]); // Delete the specified object
+            createdObjects.Remove(parameters[0]); // Remove that object from the list of created objects
+        }
+        catch // If any of the above code fails to run
+        {
+            Debug.Log("Failed to delete '" + parameters[0] + "'."); // Inform the Unity console that something went wrong
         }
         currentLine++;
     }
@@ -492,11 +649,14 @@ public class Oyster : MonoBehaviour
         // param: text = string
         // param: fontSize int
         // param: colour = hex colour (#FFFFFF)
+        // param: colourFromCharacter = string
 
         TMP_FontAsset font = null;
         string text = "";
-        int fontSize = 56;
+        int fontSize = 56; // Setup default values
         Color fontColour = new Color(0, 0, 0);
+        string anchor = "centre";
+        string alignment = "topLeft";
         if (parameters.Length > 3) // If there are optional parameters
         {
             string[] currentParameter;
@@ -509,13 +669,13 @@ public class Oyster : MonoBehaviour
                         Debug.Log("Parameter '" + currentParameter[0] + "' not recognised, ignoring parameter..."); // If the parameter name is not recognized then inform the Unity console that a parameter name was not recognised
                         break;
                     case "font": // If the parameter is 'font'
-                        try
+                        try // Try to run the below code
                         {
-                            font = loadedFonts[currentParameter[1]];
+                            font = loadedFonts[currentParameter[1]]; // Set font equal to the specified font in the list of loaded fonts
                         }
-                        catch
+                        catch // If the above code fails to run
                         {
-                            Debug.Log("Font '" + currentParameter[1] + "' not currently loaded.");
+                            Debug.Log("Font '" + currentParameter[1] + "' not currently loaded."); // Inform the Unity console that the font is not loaded
                         }
                         break;
                     case "text": // If the parameter is 'text'
@@ -534,6 +694,15 @@ public class Oyster : MonoBehaviour
                     case "colour": // If the parameter is 'colour'
                         ColorUtility.TryParseHtmlString(currentParameter[1], out fontColour); // Attempt to convert the input colour from hex to rgb
                         break;
+                    case "anchor": // If the current parameter is 'anchor'
+                        anchor = currentParameter[1]; // Set anchor equal to the current  parameter
+                        break;
+                    case "colourFromCharacter": // If the current parameter is 'colourFromCharacter'
+                        ColorUtility.TryParseHtmlString(charactersInConversation[currentParameter[1]].colour, out fontColour); // Set colour equal to the specified colour from the list of loaded characters
+                        break;
+                    case "alignment":
+                        alignment = currentParameter[1];
+                        break;
                 }
             }
         }
@@ -546,15 +715,38 @@ public class Oyster : MonoBehaviour
         outputRectTransform.sizeDelta = size; // Set the object's size equal to the size variable
         outputRectTransform.localScale = new Vector3(1, 1, 1); // Set the scale of the object to 1
         Vector2 position = String2Vector(parameters[1]); // Translate the second parameter to a vector which can then be set as the variable 'position'
-        outputRectTransform.anchoredPosition = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Set the object's position equal to position + some maths to figure out where the top left of the canvas and the object is
-        gameObjectsNames.Add(parameters[0]); // Add the object to the list of currently created object
-        if (font != null)
+        if (anchor == "topLeft") // If anchor is set to topLeft
         {
-            outputTextMesh.font = font;
+            position = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Set the object's position equal to position + some maths to figure out where the top left of the canvas and the object is
+        }
+        outputRectTransform.anchoredPosition = position; // Set the object's positions
+        createdObjects.Add(parameters[0], output); // Add the object to the list of currently created object
+        if (font != null) // If a font has been loaded
+        {
+            outputTextMesh.font = font; // Set the font equal to font
         }
         outputTextMesh.text = text;
-        outputTextMesh.fontSize = fontSize;
+        outputTextMesh.fontSize = fontSize; // Set fontsize, text and colour
         outputTextMesh.color = fontColour;
+        switch (alignment)
+        {
+            default:
+                Debug.Log("Alignment not recognised, defaulting to left.");
+                outputTextMesh.alignment = TextAlignmentOptions.Left;
+                break;
+            case "left":
+                outputTextMesh.alignment = TextAlignmentOptions.Left;
+                break;
+            case "centre":
+                outputTextMesh.alignment = TextAlignmentOptions.Center;
+                break;
+            case "center":
+                outputTextMesh.alignment = TextAlignmentOptions.Center;
+                break;
+            case "topLeft":
+                outputTextMesh.alignment = TextAlignmentOptions.TopLeft;
+                break;
+        }
         currentLine++; // Increment currentLine
     }
     #endregion
@@ -607,6 +799,7 @@ public class Oyster : MonoBehaviour
             waitingTime = 0;
             maxWaitTime = 1; // Set variables back to their default values
             autoSkip = true;
+            mouseDown = true;
             currentLine++; // Increment currentLine
         }
     }
@@ -667,14 +860,19 @@ public class Oyster : MonoBehaviour
         // param: fontSize = int
         // param: text = string
         // param: font = string
+        // param: colourFromCharacter = string
         try // Attempt to run the below code
         {
             GameObject output = GameObject.Find(parameters[0]); // Find a gameobject by the first input parameter
             RectTransform outputRectTransform = output.GetComponent<RectTransform>(); // Find the object's RectTransform component
             TextMeshProUGUI outputTextMesh = output.GetComponent<TextMeshProUGUI>(); // Find the object's TextMesh component
-            for (int i = 1; i < parameters.Length - 1; i++) // Loop through all parameters given except for the first parameter
+            Color fontColour = new Color(255, 255, 255);
+            string anchor = "centre";
+            bool modifyPosition = false;
+            string alignment = "topLeft";
+            for (int i = 0; i < parameters.Length - 1; i++) // Loop through all parameters given except for the first parameter
             {
-                string[] currentParameter = parameters[i].Split('='); // Split the current parameter into a name and a value
+                string[] currentParameter = parameters[i + 1].Split('='); // Split the current parameter into a name and a value
                 switch (currentParameter[0]) // Compare the parameter name against a list of 'choices'
                 {
                     default: // If the parameter name is not recognised
@@ -687,14 +885,18 @@ public class Oyster : MonoBehaviour
                         outputRectTransform.sizeDelta = String2Vector(parameters[i]); // Convert the currentParameter value to a Vector2 and then set the size of the found object to that value
                         break;
                     case "position": // If the parameter is 'position'
-                        Vector2 size = outputRectTransform.sizeDelta; // Find the size of the previously stored object
-                        Vector2 position = String2Vector(currentParameter[1]); // Find the position of the object using the current parameter value and String2Vector
-                        outputRectTransform.anchoredPosition = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Do some funky maths to place the object at its intended position from its top left corner, not the centre
+                        modifyPosition = true; // Find the position of the object using the current parameter value and String2Vector
+                        outputRectTransform.anchoredPosition = String2Vector(currentParameter[1]);
                         break;
                     case "colour": // If the parameter is 'colour'
-                        Color fontColour = new Color(); // Create a new colour object
+                        fontColour = new Color(); // Create a new colour object
                         ColorUtility.TryParseHtmlString(parameters[i], out fontColour); // Attempt to parse the current parameter value as a hex colour
                         outputTextMesh.color = fontColour; // Set the object's TextMesh's colour to the found colour
+                        break;
+                    case "colourFromCharacter":
+                        fontColour = new Color();
+                        ColorUtility.TryParseHtmlString(charactersInConversation[currentParameter[1]].colour, out fontColour);
+                        outputTextMesh.color = fontColour;
                         break;
                     case "fontSize": // If the parameter is 'fontSize'
                         try // Attempt to run the below code
@@ -709,17 +911,53 @@ public class Oyster : MonoBehaviour
                     case "text": // If the parameter it 'text'
                         outputTextMesh.text = currentParameter[1]; // Set the text value of the object's TextMesh to the current parameter value
                         break;
-                    case "font":
-                        try
+                    case "font": // If the parameter is 'font'
+                        try // Attempt to run the below code
                         {
                             outputTextMesh.font = loadedFonts[currentParameter[1]]; // Try to set the font to a currently loaded font
                         }
-                        catch
+                        catch // If the above code fails to run
                         {
                             Debug.Log("Font '" + currentParameter[1] + "' not currently loaded."); // Inform the Unity console that the above code failed to run
                         }
                         break;
+                    case "anchor": // If the current paramter is 'anchor'
+                        anchor = currentParameter[1]; // Set anchor equal to the current parameter
+                        break;
+                    case "alignment":
+                        alignment = currentParameter[1];
+                        break;
                 }
+            }
+            if (modifyPosition) // If modifyPosition is set to true
+            {
+                switch (anchor) // Compare the value of anchor against the below cases
+                {
+                    case "topLeft": // If anchor is topLeft
+                        Vector2 position = outputRectTransform.anchoredPosition;
+                        Vector2 size = outputRectTransform.sizeDelta; // Set the values of size and position
+                        outputRectTransform.anchoredPosition = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Do some funky maths to place the object at its intended position from its top left corner, not the centre
+                        break;
+                }
+            }
+            switch (alignment)
+            {
+                default:
+                    Debug.Log("Alignment not recognised, defaulting to topLeft.");
+                    outputTextMesh.alignment = TextAlignmentOptions.TopLeft;
+                    break;
+                case "left":
+                    outputTextMesh.alignment = TextAlignmentOptions.Left;
+                    break;
+                case "centre":
+                    outputTextMesh.alignment = TextAlignmentOptions.Center;
+                    break;
+                case "center":
+                    outputTextMesh.alignment = TextAlignmentOptions.Center;
+                    break;
+                case "topLeft":
+                    outputTextMesh.alignment = TextAlignmentOptions.TopLeft;
+                    break;
             }
         }
         catch // If any of the above code fails to run
@@ -729,10 +967,100 @@ public class Oyster : MonoBehaviour
         currentLine++; // Continue to the next line
     }
     #endregion
+    #region ModifySprite
+    private void ModifySprite(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: object name
+        // Optional parameters:
+        // param: sprite = string
+        // param: position = vector2
+        // param: anchor = string
+        // param: size = vector2
+        // param: colour = HTML colour
+        // param: sort = string
+        try // Try to run the below code
+        {
+            GameObject output = GameObject.Find(parameters[0]); // Find the sprite in the current scene
+            RectTransform outputRectTransform = output.GetComponent<RectTransform>(); // Add components to the sprite and cache them
+            UnityEngine.UI.Image outputImage = output.GetComponent<UnityEngine.UI.Image>();
+            string anchor = "centre";
+            bool modifyPosition = false; // Set default values
+            if (parameters.Length - 1 > 0) // If there are optional parameters
+            {
+                for (int i = 0; i < parameters.Length - 1; i++) // Loop through the optional parameters
+                {
+                    string[] currentParameter = parameters[i + 1].Split('='); // Split the current paramter into a name and value
+                    switch (currentParameter[0]) // Compare the current parameter's name against the below cases
+                    {
+                        default: // If the current parameter's name does not match any of the below cases
+                            Debug.Log("Parameter '" + currentParameter[0] + "' not recognised."); // Inform the Unity console that the parameter was not recognised
+                            break;
+                        case "sprite": // If the current parameter is 'sprite'
+                            try // Try to run the below code
+                            {
+                                outputImage.sprite = loadedSprites[currentParameter[1]]; // Set sprite equal to the sprite specified from loaded sprites
+                            }
+                            catch // If the above code fails to run
+                            {
+                                Debug.Log("Sprite '" + currentParameter[1] + "' is not currently loaded."); // Inform the Unity console that the sprite is not loaded
+                            }
+                            break;
+                        case "position": // If the current parameter is 'position'
+                            outputRectTransform.anchoredPosition = String2Vector(currentParameter[1]); // Set position equal to the current parameter converted to a vector2
+                            modifyPosition = true; // Set modifyPosition to true
+                            break;
+                        case "anchor": // If the current parameter is 'anchor'
+                            anchor = currentParameter[1]; // Set anchor equal to the current parameter
+                            break;
+                        case "size": // If the current parameter is 'size'
+                            outputRectTransform.sizeDelta = String2Vector(currentParameter[1]); // Set size equal to the current parameter converted to a vector2
+                            break;
+                        case "colour": // If the current parameter is 'colour'
+                            Color colour = new Color(); // Create a new colour named colour
+                            ColorUtility.TryParseHtmlString(currentParameter[1], out colour); // Convert the current parameter to a colour and store it in colour
+                            if (colour != null) // If colour is not null
+                            {
+                                outputImage.color = colour; // Set the colour of the output image to the value of colour
+                            }
+                            break;
+                        case "sort": // If the current parameter is 'sort'
+                            switch (currentParameter[1].ToLower()) // Compare the value of the current parameter against the below cases
+                            {
+                                default: // If current parameter matches none of the below cases
+                                    output.transform.parent = HUD.transform.GetChild(0); // Make the object a child of the HUD's child object 'Sprites'
+                                    break;
+                                case "overlay": // If the current parameter is 'overlay'
+                                    output.transform.parent = HUD.transform.GetChild(2); // Make the object a child of the HUD's child object 'Overlay'
+                                    break;
+                            }
+                            break;
+                    }
+                }
+                if (modifyPosition) // If modifyPosition is true
+                {
+                    switch (anchor) // Compare anchor against the below cases
+                    {
+                        case "topLeft": // If anchor is 'topLeft'
+                            Vector2 position = outputRectTransform.anchoredPosition;
+                            Vector2 size = outputRectTransform.sizeDelta; // Set size and position
+                            outputRectTransform.anchoredPosition = new Vector2((position.x - 960) + size.x / 2, (540 - position.y) - size.y / 2); // Do some funky maths to place the object at its intended position from its top left corner, not the centre
+                            break;
+                    }
+                }
+            }
+        }
+        catch // If the above code fails to run
+        {
+            Debug.Log("Image '" + parameters[0] + "' does not exist in this scene."); // Inform Unity that the sprite does not exist in this scene
+        }
+        currentLine++; // Continue to the next line
+    }
+    #endregion
     #region AddSmoothText
     private void AddSmoothText(string[] parameters)
     {
-        // Required Parameters
+        // Required Parameters:
         // param0: text
         // param1: object to add text to
         // Optional Parameters:
@@ -761,6 +1089,7 @@ public class Oyster : MonoBehaviour
                 {
                     Debug.Log("Character to add is out of range!"); // Inform the Unity console that something went wrong
                     currentCharIndex = 0; // Reset the currentCharIndex to 0
+                    charactersToAdd = 0;
                     currentLine++; // Continue to the next line
                 }
             }
@@ -823,7 +1152,6 @@ public class Oyster : MonoBehaviour
         // param: clickToSkip = bool
         // param: manipulatePermanent = bool
         // param: relativeTargetPosition = bool
-
         if (!modObj_foundObject) // If the object has not been loaded yet
         {
             try
@@ -843,7 +1171,6 @@ public class Oyster : MonoBehaviour
                 modObj_clickToSkip = true;
                 modObj_relativeTargetPosition = false;
                 modObj_manipulatePermanent = false;
-
                 for (int i = 0; i < parameters.Length - 1; i++) // Loop through all parameters
                 {
                     currentParameter = parameters[i + 1].Split('='); // Split the current parameter into a name and a value
@@ -1070,13 +1397,13 @@ public class Oyster : MonoBehaviour
     #region AddInputField
     private void AddInputField(string[] parameters)
     {
-        // Required Parameters
+        // Required Parameters:
         // param0: object name
         // param1: output variable name
         // param2: sprite
         // param3: position
         // param4: size
-        // Optional Parameters
+        // Optional Parameters:
         // param: font = string (file path)
         // param: fontSize = float
         // param: characterLimit = integer
@@ -1536,9 +1863,317 @@ public class Oyster : MonoBehaviour
     {
         // Required Parameters:
         // Optional Parameters:
-
+        // param: bumpSceneState = boolean
+        bool bumpSceneState = true;
+        if (parameters.Length > 0)
+        {
+            foreach (string parameter in parameters)
+            {
+                string[] currentParameter = parameter.Split('=');
+                switch (currentParameter[0])
+                {
+                    default:
+                        Debug.Log("Parameter '" + currentParameter[0] + "' not recognised.");
+                        break;
+                    case "bumpSceneState":
+                        try
+                        {
+                            bumpSceneState = Convert.ToBoolean(currentParameter[1]);
+                        }
+                        catch
+                        {
+                            Debug.Log("Unable to convert '" + currentParameter[1] + "' to boolean.");
+                        }
+                        break;
+                }
+            }
+        }
+        if (bumpSceneState)
+        {
+            try
+            {
+                if (PersistentVariables.documentsPath == "")
+                {
+                     PersistentVariables.documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                }
+                ProfileData profileData = JsonUtility.FromJson<ProfileData>(File.ReadAllText(PersistentVariables.documentsPath + @"\My Games\LimboLane\Profiles\" + PersistentVariables.profileName + ".json"));
+                for (int i = 0; i < profileData.locationStates.Length; i++)
+                {
+                    if (profileData.locationStates[i].name == PersistentVariables.nextSceneName)
+                    {
+                        profileData.locationStates[i].state++;
+                    }
+                }
+                File.WriteAllText(PersistentVariables.documentsPath + @"\My Games\LimboLane\Profiles\" + PersistentVariables.profileName + ".json", JsonUtility.ToJson(profileData));
+                sceneStateLoader.Run();
+            }
+            catch
+            {
+                Debug.Log("Unable to update profile with new location!");
+            }
+        }
+        currentLine++;
         inConversation = false; // Tell the script that it is no longer in a conversation
         CleanupSpeech(); // Calls the cleanup method to unload any currently loaded addressables and remove any objects created by the script
+    }
+    #endregion
+    #region ModCamFOV
+    private void ModCamFOV(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: camera name
+        // param1: target FOV
+        // Optional Parameters:
+        // param: time = float
+        // param: interpolation = string
+        // param: permanent = bool
+        // param: clickToSkip = bool
+        switch (modFOV_state) // Compare modFOV_state against the below cases
+        {
+            case 0: // setting up modFOV
+                bool failed = false; // Set failed to false
+                try // Try to run the below code
+                {
+                    modFOV_camera = GameObject.Find(parameters[0]).GetComponent<Camera>(); // Find the specified camera in the current scene
+                }
+                catch // If the above code fails to run
+                {
+                    Debug.Log("Unable to find camera '" + parameters[0] + "' in the current scene."); // Inform the Unity console that something went wrong
+                    currentLine++; // Continue to the next line
+                    failed = true; // Set failed to true
+                }
+                try // Try to run the below code
+                {
+                    modFOV_targetFOV = float.Parse(parameters[1]); // Set the targetFOV equal to the second parameter converted to a float
+                }
+                catch // If the above code fails to run
+                {
+                    Debug.Log("Failed to convert '" + parameters[1] + "' to float."); // Inform the Unity console that something went wrong
+                    currentLine++; // Continue to the next line
+                    failed = true; // Set failed to true
+                }
+                if (!failed) // If the code did not fail at any point
+                {
+                    modFOV_time = 1; // Set some default values
+                    modFOV_interpolation = "linear";
+                    modFOV_permanent = false;
+                    modFOV_ogFOV = modFOV_camera.fieldOfView;
+                    modFOV_clickToSkip = true;
+                    if (parameters.Length - 2 > 0) // If there are optional parameters
+                    {
+                        for (int i = 0; i < parameters.Length - 2; i++) // Loop through the optional parameters
+                        {
+                            string[] currentParameter = parameters[i + 2].Split('='); // Split the current parameter into a name and value
+                            switch (currentParameter[0]) // Compare the name of the current parameter against the below cases
+                            {
+                                default: // If the current parameter matches none of the below cases
+                                    Debug.Log("Parameter '" + currentParameter[0] + "' not recognised."); // Inform the Unity console that the parameter is not recognised
+                                    break;
+                                case "time": // If the current parameter is 'time'
+                                    try // Try to run the below code
+                                    {
+                                        modFOV_time = float.Parse(currentParameter[1]); // Convert the current parameter to float and store it in time
+                                    }
+                                    catch // If the above code fails to run
+                                    {
+                                        Debug.Log("Failed to convert '" + currentParameter[1] + "' to float."); // Inform the Unity console that something has gone wrong
+                                    }
+                                    break;
+                                case "interpolation": // If the current parameter is 'interpolation'
+                                    modFOV_interpolation = currentParameter[1]; // Set interpolation equal to the current parameter
+                                    break;
+                                case "permanent": // If the current parameter is 'permanent'
+                                    try // Try to run the below code
+                                    {
+                                        modFOV_permanent = Convert.ToBoolean(currentParameter[1]); // Convert the current parameter to boolean and store it in permanent
+                                    }
+                                    catch // If the above code fails to run
+                                    {
+                                        Debug.Log("Failed to convert '" + currentParameter[1] + "' to boolean."); // Inform the Unity console that something went wrong
+                                    }
+                                    break;
+                                case "clickToSkip": // If the current parameter is 'clickToSkip'
+                                    try // Try to run the below code
+                                    {
+                                        modFOV_clickToSkip = Convert.ToBoolean(currentParameter[1]); // Convert the current parameter to boolean and store it in clickToSkip
+                                    }
+                                    catch // If the above code fails to run
+                                    {
+                                        Debug.Log("Failed to convert '" + currentParameter[1] + "' to boolean."); // Inform the Unity console that something went wrong
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                    if (modFOV_permanent == false) // If the FOV change is not permanent
+                    {
+                        CameraAndFOV cameraAndFOV = new CameraAndFOV();
+                        cameraAndFOV.camera = modFOV_camera;
+                        cameraAndFOV.fov = modFOV_ogFOV; // Create a new camera and fov object
+                        modFOV_camerasToFix.Add(modFOV_camerasToFix.Count, cameraAndFOV); // Add that object to the list of cameras that need fixing
+                    }
+                    modFOV_state = 2; // Set modFOV_state to 2
+                }
+                break;
+            case 2: // modding the FOVing
+                bool done = false; // Set done to false
+                switch (modFOV_interpolation.ToLower()) // Compare interpolation against the below cases
+                {
+                    default: // No interpolation
+                        modFOV_camera.fieldOfView = modFOV_targetFOV; // Set the camera's FOV to the target FOV
+                        done = true; // Set done to true
+                        break;
+                    case "linear": // Linear interpolation
+                        if (modFOV_time < modFOV_currentTime) // If the total time is less that the current time
+                        {
+                            done = true; // Set done to true
+                        }
+                        else // Otherwise
+                        {
+                            modFOV_currentTime += Time.deltaTime; // Add delta time to the current time
+                            modFOV_camera.fieldOfView = Mathf.Lerp(modFOV_ogFOV, modFOV_targetFOV, modFOV_currentTime / modFOV_time); // Set the camera's FOV to a value that is linearly interpolated between it's starting point and the FOV target
+
+                        }
+                        break;
+                }
+                if (modFOV_clickToSkip && Input.GetAxis("PrimaryAction") > 0 && !mouseDown) // If click to skip is true and the mouse is clicked but not held
+                {
+                    modFOV_interpolation = "none"; // Set the interpolation to none
+                    mouseDown = true; // Set mousedown to true
+                }
+                if (done) // If done is true
+                {
+                    modFOV_camera = null;
+                    modFOV_interpolation = null;
+                    modFOV_ogFOV = 5;
+                    modFOV_permanent = false;
+                    modFOV_state = 0; // Reset values to their default
+                    modFOV_targetFOV = 5;
+                    modFOV_time = 1;
+                    modFOV_currentTime = 0;
+                    currentLine++; // Continue to the next line
+                }
+                break;
+        }
+
+    }
+    #endregion
+    #region ManipulateImage
+    private void ManipulateImage(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: image
+        // Optional Parameters:
+        // param: time = float
+        // param: alpha = float
+        // param: interpolation = string
+        switch (manipImg_state) // Compare state against the below cases
+        {
+            case 0: // Setup variables
+                bool success = false; // Set success to false
+                try // Try to run the below code
+                {
+                    manipImg_image = GameObject.Find(parameters[0]).GetComponent<Image>();  // Try to find the specified Image in the current scene
+                    success = true; // Set success to true
+                }
+                catch // If the above code fails to run
+                {
+                    Debug.Log("Unable to find image '" + parameters[0] + "'."); // Inform the Unity console that something went wrong
+                    currentLine++; // Continue to the next line
+                }
+                if (success) // If the above code succeeded
+                {
+                    manipImg_state = 1;
+                    manipImg_time = 1; // Set default values
+                    manipImg_currentTime = 0;
+                    manipImg_transparency = 255;
+                    manipImg_interpolation = "linear";
+                    manipImg_modTransparency = false;
+                    manipImg_ogTransparency = manipImg_image.color.a;
+                    if (parameters.Length > 1) // If there are optional parameters
+                    {
+                        for (int i = 0; i < parameters.Length - 1; i++) // Loop through the optional parameters
+                        {
+                            string[] currentParameter = parameters[i + 1].Split('='); // Split the current parameter into a name and value
+                            switch (currentParameter[0]) // Compare the name of the current parameter against the below cases
+                            {
+                                default: // If the parameter matches none of the below cases
+                                    Debug.Log("Parameter '" + currentParameter[0] + "' not recognised."); // Inform the Unity console that the parameter was not recognised
+                                    break;
+                                case "time": // If the parameter is 'time'
+                                    try // Try to run the below code
+                                    {
+                                        manipImg_time = float.Parse(currentParameter[1]); // Convert the current parameter to float and store the value as time
+                                    }
+                                    catch // If the above code fails to run
+                                    {
+                                        Debug.Log("Failed to convert '" + currentParameter[1] + "' to float."); // Inform the Unity console that something went wrong
+                                    }
+                                    break;
+                                case "alpha": // If the current parameter is 'alpha'
+                                    try // Try to run the below code
+                                    {
+                                        manipImg_transparency = float.Parse(currentParameter[1]); // Set transparency equal to the current parameter as a float
+                                        manipImg_transparency = Mathf.Clamp(manipImg_transparency, 0, 1); // Clamp the value of transparency to between 0 and 1
+                                        manipImg_modTransparency = true; // Set modTransparency to true
+                                    }
+                                    catch // If any of the above code fails to run
+                                    {
+                                        Debug.Log("Failed to convert '" + currentParameter[1] + "' to float."); // Inform the Unity console that something went wrong
+                                    }
+                                    break;
+                                case "interpolation": // If the parameter is 'interpolation'
+                                    manipImg_interpolation = currentParameter[1]; // Set interpolation equal to the current parameter
+                                    break;
+                            }
+                        }
+                    }
+                }
+                break;
+            case 1: // do the stuff
+                bool done = true; // Set done to true
+                switch (manipImg_interpolation) // Compare interpolation to the below cases
+                {
+                    default: // no interpolation
+                        if (manipImg_modTransparency) // If transparency is to be changed
+                        {
+                            manipImg_image.color = new Color(manipImg_image.color.r, manipImg_image.color.g, manipImg_image.color.b, manipImg_transparency); // Set the transparency of the image equal to the target transparency
+                        }
+                        break;
+                    case "linear": // linear interpolation
+                        if (manipImg_modTransparency && manipImg_currentTime < manipImg_time) // If the transparecy is to be changed and the current time is less than the total time
+                        {
+                            manipImg_image.color = new Color(manipImg_image.color.r, manipImg_image.color.g, manipImg_image.color.b, Mathf.Lerp(manipImg_ogTransparency, manipImg_transparency, manipImg_currentTime / manipImg_time)); // Set the transparency of the image equal to a value linearly interpolated between the original transparency and the target transparency
+                            done = false; // Set done to false
+                        }
+                        manipImg_currentTime += Time.deltaTime; // Add delta time to the current time
+                        break;
+                }
+                if (done) // If done is true
+                {
+                    manipImg_image.color = new Color(manipImg_image.color.r, manipImg_image.color.g, manipImg_image.color.b, manipImg_transparency); // Set the transparency equal to the target transparency to clear up any rounding error on interpolation
+                    manipImg_state = 1; // Set values back to their default
+                    manipImg_time = 1;
+                    manipImg_currentTime = 0;
+                    manipImg_transparency = 255;
+                    manipImg_interpolation = "linear";
+                    manipImg_ogTransparency = 255;
+                    manipImg_modTransparency = false;
+                    manipImg_image = null;
+                    manipImg_state = 0;
+                    currentLine++; // Continue to the next line
+                }
+                break;
+        }
+    }
+    #endregion
+    #region LoadScene
+    private void LoadScene(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: scene name
+        PersistentVariables.nextSceneName = parameters[0]; // Set the name of the next scene to the current parameter
+        SceneManager.LoadScene("LoadingScreen"); // Load the loading scene
     }
     #endregion
     #endregion
@@ -1639,16 +2274,76 @@ public class Oyster : MonoBehaviour
             vectory = 100f;
             vectorz = 100f;
         }
-        return new Vector3(vectorx, vectory, vectorz); // Return a new vector made of vectorx and vectory
+        return new Vector3(vectorx, vectory, vectorz); // Return a new vector made of vectorx, vectory and vectorz
+    }
+    private Vector4 String4Vector(string input)
+    {
+        float vectorx = 0;
+        float vectory = 0; // Set default values
+        float vectorz = 0;
+        float vectorw = 0;
+        string tempString = "";
+        int readingValue = 0;
+        try // Attempt to run the below code
+        {
+            foreach (char chr in input) // Loop through each character in the input string
+            {
+                switch (chr)
+                {
+                    default: // Skip if none of the below conditions are met
+                        break;
+                    case '(': // If the character is an open bracket
+                        readingValue++; // Increment which value is currently being read
+                        break;
+                    case ',': // If the character is a comma
+                        tempString = tempString.Replace("(", ""); // Set tempString equal to itself minus the open bracket
+                        tempString = tempString.Replace(",", ""); // Set tempString equal to itself minus the comma
+                        if (readingValue == 1) // If this is the first value being read
+                        {
+                            vectorx = float.Parse(tempString); // Set vectorx equal to tempString
+                        }
+                        if (readingValue == 2) // If this is the second value being read
+                        {
+                            vectory = float.Parse(tempString); // Set vectory equal to tempString
+                        }
+                        else // If this is any other value (a.k.a: if this is the third value)
+                        {
+                            vectorz = float.Parse(tempString); // Set vectorz equal to tempString
+                        }
+                        tempString = ""; // Set tempString back to being empty
+                        readingValue++; // Increment which value is currently being read
+                        break;
+                    case ')':
+                        tempString = tempString.Replace(",", ""); // Set tempString equal to itself minus the comma
+                        vectorw = float.Parse(tempString); // Set vectorw equal to tempString
+                        tempString = ""; // Set tempString back to being empty
+                        break;
+                }
+                tempString += chr; // Add the current character to tempString
+            }
+            if (readingValue == 0)
+            {
+                throw new InvalidDataException();
+            }
+        }
+        catch // If any of the above code fails to run
+        {
+            Debug.Log("Failed to convert input string to vector! Continuing with (100f, 100f, 100f, 100f)"); // Inform the Unity console that something wrong happened
+            vectorx = 100f; // Set vectorx, vectory, vectorz and vectorw to default values
+            vectory = 100f;
+            vectorz = 100f;
+            vectorw = 100f;
+        }
+        return new Vector4(vectorx, vectory, vectorz, vectorw); // Return a new vector made of vectorx, vectory, vectorz and vectorw
     }
     private void CleanupSpeech() // Destroys all objects and addressables created by a script
     {
-        foreach (string str in gameObjectsNames) // Loops through each entry in gameOBjectsNames
+        foreach (KeyValuePair<string, GameObject> entry in createdObjects) // Loops through each entry in gameOBjectsNames
         {
             try // Attempts to find and destroy a gameObject
             {
-                Destroy(GameObject.Find(str)); // Find and destroy object
-                Debug.Log("Destroyed " + str + " during cleanp"); // Tell the Unity console that an object was found and destroyed
+                Destroy(entry.Value); // Find and destroy object
+                Debug.Log("Destroyed " + entry.Key + " during cleanp"); // Tell the Unity console that an object was found and destroyed
             }
             catch // If it fails to destroy an object
             {
@@ -1674,14 +2369,21 @@ public class Oyster : MonoBehaviour
             modObj_objectsToFix[c].gameObject.transform.eulerAngles = modObj_objectsToFix[c].oldState[1]; // Restore the object's transform values back to the values stored in the dictionary
             modObj_objectsToFix[c].gameObject.transform.localScale = modObj_objectsToFix[c].oldState[2];
         }
+        for (int i = 0; i < modFOV_camerasToFix.Count; i++)
+        {
+            int c = modFOV_camerasToFix.Count - 1 - i;
+            modFOV_camerasToFix[c].camera.fieldOfView = modFOV_camerasToFix[c].fov;
+        }
+        currentLine = 0;
         loadedAddressables = new Dictionary<int, AsyncOperationHandle>();
-        gameObjectsNames = new List<string>(); // Reset the object and handle trackers to being null for when another script is ran
+        createdObjects = new Dictionary<string, GameObject>(); // Reset the object and handle trackers to being null for when another script is ran
         speechCooldown = speechCooldownTime; // Set the speechCooldown to the provided time, so that a speech cannot be instantly started after this one. Useful for if the previous speech finished with a click event
         charactersInConversation = new Dictionary<string, CharacterData>();
         characterObjectsInConversation = new Dictionary<string, GameObject>(); // Reset some Dictionaries to be empty again
         modObj_objectsToFix = new Dictionary<int, ObjectAndPosition>();
+        modFOV_camerasToFix = new Dictionary<int, CameraAndFOV>();
         loadedFonts = new Dictionary<string, TMP_FontAsset>();
-        loadedSprites = new Dictionary<string, Sprite>();
+        loadedSprites = new Dictionary<string, Sprite>(); // Maybe more than some dictionaries
         conversationStrings = new Dictionary<string, string>();
         lineMarkers = new Dictionary<string, int>();
     }

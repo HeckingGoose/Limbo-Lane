@@ -47,4 +47,8 @@ public class OysterInitialiseScript : MonoBehaviour
                 break;
         }
     }
+    public void CallScript(OysterCharacterScript script) // Public function that starts the conversation specified in the parameters when called externally
+    {
+        script.StartSpeech();
+    }
 }

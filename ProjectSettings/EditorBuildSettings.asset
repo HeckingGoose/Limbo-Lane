@@ -8,9 +8,18 @@ EditorBuildSettings:
   - enabled: 0
     path: 
     guid: 00000000000000000000000000000000
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Testing.unity
     guid: 8fd47f0624f4b1d44a17872043d173ca
+  - enabled: 1
+    path: Assets/Scenes/AlexHouse.unity
+    guid: 74f9dcee74a46c442b7826f1784ac767
+  - enabled: 1
+    path: Assets/Scenes/LoadingScreen.unity
+    guid: 006957a9af7cbf8418fc8e49a9979ac2
+  - enabled: 1
+    path: Assets/Scenes/AlyxRoom.unity
+    guid: ebfc84d1f32d74c4f8b56598615645c9
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: d86403e65819bee48ad2a50af9d058d9, type: 2}
     com.unity.input.settings: {fileID: 11400000, guid: 521382b8fb0880c4196923a745c086e4, type: 2}
