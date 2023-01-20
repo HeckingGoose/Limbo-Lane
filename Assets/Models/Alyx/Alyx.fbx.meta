@@ -21,12 +21,6 @@ ModelImporter:
   - first:
       74: -7831077962326980393
     second: Alyx_Armature|StandFromChairIntimidate
-  - first:
-      74: 6315980134739040714
-    second: Arms|Basis
-  - first:
-      74: 6481809869699647016
-    second: Arms|Float_Idle
   externalObjects:
   - first:
       type: UnityEngine:Material

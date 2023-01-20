@@ -167,6 +167,12 @@ MonoBehaviour:
     m_SerializedLabels: []
     m_MainAsset: {fileID: 0}
     m_TargetAsset: {fileID: 0}
+  - m_GUID: fed8267fa2b5a70428110480b20125dd
+    m_Address: Assets/Oyster/Sprites/Characters/Alex/AlexSleepy.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 61e57010f7958304d98f7fd5618c7f0c, type: 2}
   m_SchemaSet:

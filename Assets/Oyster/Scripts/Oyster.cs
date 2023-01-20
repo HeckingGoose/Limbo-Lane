@@ -45,6 +45,10 @@ public class Oyster : MonoBehaviour
     private Dictionary<string, GameObject> characterObjectsInConversation = new Dictionary<string, GameObject>();
     private Dictionary<string, string> conversationStrings = new Dictionary<string, string>();
     private bool waiting = false;
+    private bool mouseClicked = false;
+    private bool mouseHasClicked = false;
+    private float skipSpeed;
+    private float currentSkipTime;
     #endregion
     #region WaitForInput
     private float waitingTime = 0;
@@ -52,7 +56,7 @@ public class Oyster : MonoBehaviour
     private bool autoSkip = true;
     #endregion
     #region AddSmoothText
-    private int charactersPerSecond = 2;
+    private float charactersPerSecond = 2f;
     private float smoothTextWaitTime = 0;
     private int currentCharIndex = 0; // Variables for the AddSmoothText function
     #endregion
@@ -123,6 +127,19 @@ public class Oyster : MonoBehaviour
     [SerializeField]
     private Dictionary<string, int> lineMarkers = new Dictionary<string, int>();
     #endregion
+    #region ModShapeKey
+    private int msk_state = 0;
+    private int msk_shapeKeyId;
+    private Mesh msk_mesh;
+    private SkinnedMeshRenderer msk_skinnedMesh;
+    private string msk_interpolation;
+    private float msk_maxTime;
+    private float msk_currentTime;
+    private float msk_ogShapeKeyValue;
+    private float msk_targetShapeKeyValue;
+    private bool msk_clickToSkip = false;
+    private bool msk_writing = false;
+    #endregion
     #region Addressables variables
     #region General
     private Dictionary<int, AsyncOperationHandle> loadedAddressables = new Dictionary<int, AsyncOperationHandle>(); // Acts as a list of references for addressables that cannot be unloaded until they stop being used. Such as sprites or fonts
@@ -138,6 +155,9 @@ public class Oyster : MonoBehaviour
     private Dictionary<string, Sprite> loadedSprites = new Dictionary<string, Sprite>();
     #endregion
     #endregion
+    #endregion
+    #region Other
+    private float maxTimeUntilNextFrame = 0.2f;
     #endregion
     void Start()
     {
@@ -159,7 +179,7 @@ public class Oyster : MonoBehaviour
         }
         #endregion
         #region Handle whether mouse is being held or ¬
-        if (Input.GetAxis("PrimaryAction") > 0) // If the mouse is being held
+        if (Input.GetAxis("PrimaryAction") > 0 && mouseHasClicked) // If the mouse is being held
         {
             mouseDown = true; // Then tell the script that it is currently being held, rather than has just been clicked
         }
@@ -167,11 +187,58 @@ public class Oyster : MonoBehaviour
         {
             mouseDown = false; // Then tell the script that the mouse is no longer being held
         }
+        if (Input.GetAxis("PrimaryAction") > 0 || Input.GetAxis("SkipText") > 0)
+        {
+            if (currentSkipTime > skipSpeed)
+            {
+                mouseClicked = true;
+                currentSkipTime = 0;
+            }
+            else
+            {
+                mouseClicked = false;
+                currentSkipTime += Time.deltaTime;
+            }
+            mouseHasClicked = true;
+        }
+        else
+        {
+            mouseClicked = false;
+            mouseHasClicked = false;
+            currentSkipTime = skipSpeed + 1;
+        }
         #endregion
         #region Handle speech cooldown
         if (speechCooldown > 0) // If the cooldown between conversations has not yet reached 0 seconds
         {
             speechCooldown -= Time.deltaTime; // Subtract the time taken to render this frame from the cooldown timer
+        }
+        #endregion
+    }
+    private void LateUpdate() // Called before animators are applied but after they are calculated
+    {
+        #region ModShapeKey
+        if (msk_writing) // If the shape key needs changing
+        {
+            switch (msk_interpolation) // Pick which interpolation to use
+            {
+                default: // No interpolation
+                    msk_skinnedMesh.SetBlendShapeWeight(msk_shapeKeyId, msk_targetShapeKeyValue); // Set the shape key to its target weight
+                    msk_writing = false; // Set writing to false
+                    break;
+                case "linear": // Linear interpolation
+                    msk_currentTime += Time.deltaTime; // Add deltaTime to currentTime
+                    if (msk_currentTime > msk_maxTime) // If currentTime is more than maxTime
+                    {
+                        msk_interpolation = "none"; // Set the interpolation to none
+                    }
+                    else // Otherwise
+                    {
+                        // Linearly interpolate the weight of the shape key
+                        msk_skinnedMesh.SetBlendShapeWeight(msk_shapeKeyId, Mathf.Lerp(msk_ogShapeKeyValue, msk_targetShapeKeyValue, msk_currentTime / msk_maxTime));
+                    }
+                    break;
+            }
         }
         #endregion
     }
@@ -190,6 +257,15 @@ public class Oyster : MonoBehaviour
             if (speechCooldown <= 0)
             {
                 waiting = false;
+                if (PersistentVariables.skipSpeed != -1)
+                {
+                    skipSpeed = PersistentVariables.skipSpeed;
+                }
+                else
+                {
+                    Debug.Log("Unable to load skip speed, defaulting to 0.5");
+                    skipSpeed = 0.1f;
+                }
                 if (PersistentVariables.charactersPerSecond != 0)
                 {
                     charactersPerSecond = PersistentVariables.charactersPerSecond;
@@ -198,15 +274,14 @@ public class Oyster : MonoBehaviour
                 {
                     Debug.Log("Characters per second not set, defaulting to 2!");
                 }
-                try // Try to run the below code
+                if (PersistentVariables.linesPerFrame != -1)
                 {
-                    string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments); // Define the documents path
-                    maxLinesPerFrame = JsonUtility.FromJson<Options>(File.ReadAllText(documentsPath + @"\My Games\LimboLane\options.json")).linesPerFrame; // Read the max lines per frame from the settings file
+                    maxLinesPerFrame = PersistentVariables.linesPerFrame;
                 }
-                catch
+                else
                 {
-                    Debug.Log("Unable to load linesPerFrame from options.json, defaulting to 5."); // Inform the Unity console that something went wrong
-                    maxLinesPerFrame = 5; // Set max lines per frame to a default value
+                    Debug.Log("Lines per frame could not be loaded, defaulting to 5!");
+                    maxLinesPerFrame = 5;
                 }
                 inConversation = true; // Set inConversation to true so that on next entry the method knows a conversation is underway
                 AsyncOperationHandle<TextAsset> conversationDataHandle = Addressables.LoadAssetAsync<TextAsset>("Assets/Oyster/JSON/Conversations-" + language + "/Character" + _characterIndex.ToString() + "-Conversations.json"); // Begin loading the required conversation, with multiple language support. Nifty
@@ -218,8 +293,13 @@ public class Oyster : MonoBehaviour
         else // If this is a re-entry from a currently running conversation
         {
             bool lineAlreadyProcessed = false; // Reset the flag stating whether a line has already been processed or not. This flag is set for time sensitive commands that occur across multiple loops but are required to be ran once a frame so that 1 deltaTime = 1 frame, such as a wait command
-            for (int i = 0; i < maxLinesPerFrame; i++) // Loop until the max amount of lines per frame has been reached
+            //for (int i = 0; i < maxLinesPerFrame; i++) // Loop until the max amount of lines per frame has been reached
+            int i = 0;
+            float currentWaitTime = 0;
+            while (i < maxLinesPerFrame && maxTimeUntilNextFrame > currentWaitTime)
             {
+                i++;
+                currentWaitTime += Time.deltaTime;
                 try // Attempt to interpret the command at index currentLine
                 {
                     bool removingBlank = true; // Spaces default to not being read
@@ -280,7 +360,11 @@ public class Oyster : MonoBehaviour
                             ModifyTextBox(currentLineParameters);
                             break;
                         case "AddSmoothText": // Calls the AddSmoothText method when the command AddSmoothText is read
-                            AddSmoothText(currentLineParameters);
+                            if (!lineAlreadyProcessed)
+                            {
+                                AddSmoothText(currentLineParameters);
+                                lineAlreadyProcessed = true;
+                            }
                             break;
                         case "ManipulateObject": // Calls the ManipulateObject method when the command ManipulateObject is read
                             if (!lineAlreadyProcessed)
@@ -344,6 +428,13 @@ public class Oyster : MonoBehaviour
                             break;
                         case "LoadScene": // Calls the LoadScene method when the command LoadScene is read
                             LoadScene(currentLineParameters);
+                            break;
+                        case "ModShapeKey":
+                            if (!lineAlreadyProcessed)
+                            {
+                                lineAlreadyProcessed = true;
+                                ModShapeKey(currentLineParameters);
+                            }
                             break;
                     }
                     failedReadAttempts = 0; // Resets the total failures of this try statement to 0
@@ -794,7 +885,7 @@ public class Oyster : MonoBehaviour
                 waitingTime += Time.deltaTime; // Add the current time between each frame to the waitingTime
             }
         }
-        if (Input.GetAxis("PrimaryAction") > 0 && !mouseDown) // If the mouse is clicked and not held
+        if (mouseClicked && !mouseDown) // If the mouse is clicked and not held
         {
             waitingTime = 0;
             maxWaitTime = 1; // Set variables back to their default values
@@ -1065,11 +1156,11 @@ public class Oyster : MonoBehaviour
         // param1: object to add text to
         // Optional Parameters:
         // param: clickToSkip = bool
-        smoothTextWaitTime += Time.deltaTime; // Add the time between the last frame and this frame to the current wait time
-        if (smoothTextWaitTime * charactersPerSecond >= 1) // If the wait time multiplied by the total characters per second exceeds 1
+        smoothTextWaitTime += Time.deltaTime * charactersPerSecond; // Add the time between the last frame and this frame to the current wait time
+        if (smoothTextWaitTime >= 1) // If the wait time multiplied by the total characters per second exceeds 1
         {
             int charactersToAdd = Convert.ToInt32(smoothTextWaitTime); // Truncate the current wait time to find how many characters need to be added - this will almost always return one, however it is here to handle sudden frame dips where delta time may be more than 1
-            smoothTextWaitTime = (smoothTextWaitTime * charactersPerSecond) % 1; // Remove any value on the left of the decimal point
+            smoothTextWaitTime = smoothTextWaitTime % 1; // Remove any value on the left of the decimal point
             TextMeshProUGUI outputTextMesh = null; // Create a default value for a TextMesh
             try // Attempt to run the below code
             {
@@ -1116,7 +1207,7 @@ public class Oyster : MonoBehaviour
                     break;
             }
         }
-        if (clickToSkip && !mouseDown && Input.GetAxis("PrimaryAction") > 0) // If clickToSkip is true, the mouse is not currently held and the mouse has been clicked
+        if (clickToSkip && !mouseDown && mouseClicked) // If clickToSkip is true, the mouse is not currently held and the mouse has been clicked
         {
             mouseDown = true; // Set mouseDown to true
             TextMeshProUGUI outputTextMesh = null; // create an empty TextMesh variable
@@ -1246,7 +1337,7 @@ public class Oyster : MonoBehaviour
         else // If the object has been loaded
         {
             bool done = false; // Set done to a default value
-            if (modObj_clickToSkip && Input.GetAxis("PrimaryAction") > 0 && !mouseDown) // If clickToSkip is true and the mouse is being clicked and the mouse is not being held
+            if (modObj_clickToSkip && mouseClicked && !mouseDown) // If clickToSkip is true and the mouse is being clicked and the mouse is not being held
             {
                 mouseDown = true; // Set mouseDown to true
                 modObj_interpolation = "none"; // Set the interpolation mode to none
@@ -2036,7 +2127,7 @@ public class Oyster : MonoBehaviour
                         }
                         break;
                 }
-                if (modFOV_clickToSkip && Input.GetAxis("PrimaryAction") > 0 && !mouseDown) // If click to skip is true and the mouse is clicked but not held
+                if (modFOV_clickToSkip && mouseClicked && !mouseDown) // If click to skip is true and the mouse is clicked but not held
                 {
                     modFOV_interpolation = "none"; // Set the interpolation to none
                     mouseDown = true; // Set mousedown to true
@@ -2174,6 +2265,143 @@ public class Oyster : MonoBehaviour
         // param0: scene name
         PersistentVariables.nextSceneName = parameters[0]; // Set the name of the next scene to the current parameter
         SceneManager.LoadScene("LoadingScreen"); // Load the loading scene
+    }
+    #endregion
+    #region ModShapeKey
+    private void ModShapeKey(string[] parameters)
+    {
+        // Required Parameters:
+        // param0: Shape key name
+        // param1: Object name
+        // param2: Target value
+        // Optional Parameters:
+        // param: time = float
+        // param: interpolation = string
+        // param: subObjectName = string
+        // param: clickToSkip = bool
+        switch (msk_state) // Pick which state the method is in
+        {
+            default: // If none of the cases match the currentState
+                Debug.Log("State '" + msk_state.ToString() + "' not recognised!"); // Inform the Unity console that something has gone wrong
+                break;
+            case 0: // Setting up
+                bool failed = false; // Set failed to false
+                GameObject tempObject = null; // Create a new null gameObject
+                try // Try to run the below code
+                {
+                    tempObject = GameObject.Find(parameters[1]); // Load values from parameters
+                    msk_targetShapeKeyValue = float.Parse(parameters[2]);
+                    msk_currentTime = 0;
+                    msk_maxTime = 1;
+                    msk_interpolation = "none"; // Set default values
+                    msk_clickToSkip = false;
+                    if (parameters.Length > 3) // If there are optional parameters
+                    {
+                        for(int i = 0; i < parameters.Length - 3; i++) // Loop through the optional parameters
+                        {
+                            string[] currentParameter = parameters[i + 3].Split('='); // Split the current parameter into a name and a value
+                            switch (currentParameter[0]) // Compare the current parameter against a list of cases
+                            {
+                                default: // If the parameter name matches none of the below cases
+                                    Debug.Log("Parameter '" + currentParameter[0] + "' not recognised."); // Inform the Unity console that something went wrong
+                                    break;
+                                case "subObjectName": // If the parameter is subObjectName
+                                    tempObject = tempObject.transform.Find(currentParameter[1]).gameObject; // Try to find the stated object
+                                    if (tempObject == null) // If the object could not be found
+                                    {
+                                        Debug.Log("Unable to find object child!"); // Inform the Unity console that something went wrong
+                                        failed = true; // Set failed to true
+                                    }
+                                    break;
+                                case "time": // If the parameter is time
+                                    try // Try to run the below code
+                                    {
+                                        msk_maxTime = float.Parse(currentParameter[1]); // Set maxTime to the parameter value
+                                    }
+                                    catch // If the above code fails to run
+                                    {
+                                        Debug.Log("Unable to resolve '" + currentParameter[1] + "' to float."); // Inform the Unity console that something went wrong
+                                    }
+                                    break;
+                                case "interpolation": // If the parameter name is interpolation
+                                    msk_interpolation = currentParameter[1]; // Set interpolation to the parameter value
+                                    break;
+                                case "clickToSkip": // If the parameter name is clickToSkip
+                                    try // Try to run the below code
+                                    {
+                                        msk_clickToSkip = Convert.ToBoolean(currentParameter[1]); // Convert the parameter value to a boolean
+                                    }
+                                    catch // If the above code fails to run
+                                    {
+                                        Debug.Log("Unable to parse '" + currentParameter[1] + "' as boolean."); // Inform the Unity console that something went wrong
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                }
+                catch // If the above code fails to run
+                {
+                    Debug.Log("Unable to resolve inputs for ModShapeKey!"); // Inform the Unity console that something went wrong
+                    failed = true; // Set failed to true
+                }
+                if (!failed) // If the code did not fail
+                {
+                    // Find shape key
+                    msk_skinnedMesh = tempObject.GetComponent<SkinnedMeshRenderer>(); // Cache the SkinnedMeshRender of theobject
+                    msk_mesh = msk_skinnedMesh.sharedMesh; // Cache the mesh of the object
+                    msk_shapeKeyId = msk_mesh.GetBlendShapeIndex(parameters[0]); // Find and store the shape key ID
+                    if (msk_shapeKeyId == -1) // If the ID is -1
+                    {
+                        failed = true; // Set failed to true
+                        Debug.Log("Shape key '" + parameters[0] + "' does not exist"); // Inform the Unity console that the shape key does not exist
+                    }
+                    else // If the ID is anything else
+                    {
+                        msk_ogShapeKeyValue = msk_skinnedMesh.GetBlendShapeWeight(msk_shapeKeyId); // Set the shape key value equal to the weight of the shape key
+                        msk_state = 1; // Set state to 1
+                        msk_writing = true; // Set writing to true
+                    }
+                }
+                if (failed) // If the code failed at any point
+                {
+                    msk_targetShapeKeyValue = 0;
+                    msk_currentTime = 0;
+                    msk_maxTime = 1;
+                    msk_interpolation = "none";
+                    msk_mesh = null;
+                    msk_skinnedMesh = null; // Set variables back to their default values
+                    msk_targetShapeKeyValue = 0;
+                    msk_ogShapeKeyValue = 0;
+                    msk_shapeKeyId = 0;
+                    msk_state = 0;
+                    msk_clickToSkip = false;
+                    currentLine++; // Skip to the next line
+                }
+                break;
+            case 1: // Actually shaping the keying
+                if (msk_clickToSkip && mouseClicked && !mouseDown) // If clickToSkip is true, mouseDown is false and the mouse is clicked
+                {
+                    msk_interpolation = "none"; // Set interpolation to none
+                    mouseDown = true; // Set mouseDown to true
+                }
+                if (!msk_writing) // If writing is false
+                {
+                    msk_targetShapeKeyValue = 0;
+                    msk_currentTime = 0;
+                    msk_maxTime = 1;
+                    msk_interpolation = "none"; // Set variables back to their default values
+                    msk_mesh = null;
+                    msk_skinnedMesh = null;
+                    msk_targetShapeKeyValue = 0;
+                    msk_ogShapeKeyValue = 0;
+                    msk_shapeKeyId = 0;
+                    msk_state = 0;
+                    msk_clickToSkip = false;
+                    currentLine++; // Continue to the next line
+                }
+                break;
+        }
     }
     #endregion
     #endregion

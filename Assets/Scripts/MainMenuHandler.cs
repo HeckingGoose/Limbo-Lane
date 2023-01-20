@@ -32,9 +32,20 @@ public class MainMenuHandler : MonoBehaviour
     private int loadGameState = 0;
     #endregion
     #region Graphics options objects
+    //[SerializeField]
+    //private TMP_Dropdown qualityDropdown;
     [SerializeField]
-    private TMP_Dropdown qualityDropdown;
+    private TMP_Dropdown windowModeDropdown;
+    [SerializeField]
+    private Toggle vsyncToggle;
+    [SerializeField]
+    private Slider maxTextureSizeSlider;
+    [SerializeField]
+    private TextMeshProUGUI maxTextureSizeText;
     private string[] availableQualitySettings;
+    private string windowMode;
+    private bool vsync;
+    private int maxTextureSize;
     #endregion
     #region Sound options objects
     [SerializeField]
@@ -45,6 +56,8 @@ public class MainMenuHandler : MonoBehaviour
     private TMP_InputField linesPerFrameText;
     [SerializeField]
     private TMP_InputField charactersPerFrameText;
+    [SerializeField]
+    private Slider skipSpeedSlider;
     #endregion
     #region Other
     [SerializeField]
@@ -56,6 +69,20 @@ public class MainMenuHandler : MonoBehaviour
     void Start() // On script start
     {
         profileHandler.DoChecks(); // Ensure that the profile handler has done its checks
+        windowMode = profileHandler.windowedMode;
+        vsync = profileHandler.vsync;
+        vsyncToggle.isOn = vsync;
+        maxTextureSize = profileHandler.maxTextureSize;
+        maxTextureSizeText.text = Convert.ToInt32(100 / (maxTextureSize + 1)).ToString() + "%";
+        maxTextureSizeSlider.value = maxTextureSize;
+        for (int i = 0; i < windowModeDropdown.options.Count; i++)
+        {
+            if (windowModeDropdown.options[i].text.ToLower() == windowMode.ToLower())
+            {
+                windowModeDropdown.value = i;
+            }
+        }
+        /*
         #region Populate quality options
         availableQualitySettings = QualitySettings.names; // Find the names of the available quality options
         List<Sprite> options = new List<Sprite>(); // create a new list of sprites
@@ -70,13 +97,15 @@ public class MainMenuHandler : MonoBehaviour
         }
         qualityDropdown.value = QualitySettings.GetQualityLevel(); // Set the current value of the dropdown text to the current quality level
         #endregion
+        */
         #region Populate Oyster options
         linesPerFrameText.text = profileHandler.linesPerFrame.ToString(); // Set lines per frame equal to the value of linesperframe stored in profilehandler
         charactersPerFrameText.text = PersistentVariables.charactersPerSecond.ToString();
+        skipSpeedSlider.value = PersistentVariables.skipSpeed;
         #endregion
         #region Populate load game options
         string[] profiles = profileHandler.FindProfiles(); // Repeat the same as above to populate the load game options dropdown
-        options = new List<Sprite>();
+        List<Sprite> options = new List<Sprite>();
         foreach (string profile in profiles)
         {
             options.Add(null);
@@ -107,20 +136,33 @@ public class MainMenuHandler : MonoBehaviour
                 newGameState = 1;
                 break;
             case 1: // create new save file
-                bool success = profileHandler.SaveNewGame(newGameInput.text);
-                if (success)
+                int successState = profileHandler.SaveNewGame(newGameInput.text);
+                switch (successState)
                 {
-                    // launch into game
-                    newGameInput.text = "";
-                    newGamePrompt.SetActive(false);
-                    GameObject.Destroy(blocker);
-                    blocker = null;
-                    newGameState = 2;
-                    NewGame();
-                }
-                else
-                {
-                    Debug.Log("This save file already exists!"); // Inform Unity that the save already exists
+                    default:
+                        Debug.Log("State '" + successState.ToString() + "' not recognised.");
+                        break;
+                    case 0: // success
+                            // launch into game
+                        newGameInput.text = "";
+                        newGamePrompt.SetActive(false);
+                        GameObject.Destroy(blocker);
+                        blocker = null;
+                        newGameState = 2;
+                        NewGame();
+                        break;
+                    case 1: // File already exists
+                        Debug.Log("This save file already exists!"); // Inform Unity that the save already exists
+
+                        // add code to create an error box and then a blocker
+
+                        break;
+                    case 2: // File name contains invalid characters
+                        Debug.Log("This save file contains invalid characters"); // Inform Unity that the save file contains invalid characters
+
+                        // add code to create an error box and then a blocker
+
+                        break;
                 }
                 break;
             case 2: // launch into new game
@@ -176,7 +218,8 @@ public class MainMenuHandler : MonoBehaviour
     #endregion
     #region Options
     #region Graphics options
-    public void SwitchGraphicsOptions()
+    /*
+    public void SwitchQualityLevel()
     {
         string optionName = availableQualitySettings[qualityDropdown.value]; // Find the name of the selected graphics option
         for (int i = 0; i < availableQualitySettings.Length; i++) // Loop through the available graphics options
@@ -187,6 +230,47 @@ public class MainMenuHandler : MonoBehaviour
             }
         }
     }
+    */
+    public void SwitchMaxTextureSize()
+    {
+        maxTextureSize = Convert.ToInt32(maxTextureSizeSlider.value); // Convert the texture size slider to an integer
+        QualitySettings.masterTextureLimit = maxTextureSize; // Set the texturelimit to maxTextureSize
+        maxTextureSizeText.text = Convert.ToInt32(100 / (maxTextureSize + 1)).ToString() + "%"; // Calculate the percentage resolution of textures and set the text of maxTextureSizeText to that
+    }
+    public void SwitchWindowMode()
+    {
+        switch (windowModeDropdown.options[windowModeDropdown.value].text.ToLower()) // Pick which window mode is being set
+        {
+            default: // If none of the below modes match
+                Debug.Log("Window mode '" + windowModeDropdown.options[windowModeDropdown.value].text + "' not recognised."); // Inform the Unity console that something went wrong
+                break;
+            case "borderless window": // If the window mode is borderless window
+                Screen.fullScreenMode = FullScreenMode.FullScreenWindow; // Set the window mode to borderless window
+                windowMode = "Borderless Window"; // Store a string referencing the current window mode
+                break;
+            case "exclusive fullscreen": // If the window mode is exclusive fullscreen
+                Screen.fullScreenMode = FullScreenMode.ExclusiveFullScreen; // Set the window mode to exclusive fullscreen (on some platforms this defaults back to borderless window)
+                windowMode = "Exclusive Fullscreen"; // Store a string referencing the current window mode
+                break;
+            case "windowed": // If the window mode is windowed
+                Screen.fullScreenMode = FullScreenMode.Windowed; // Set the window mode to windowed
+                windowMode = "Windowed"; // Store a string referencing the current window mode
+                break;
+        }
+    }
+    public void SwitchVsync()
+    {
+        if (vsyncToggle.isOn) // If the toggle is currently in a ticked state
+        {
+            vsync = true; // Set the reference to vsync to true
+            QualitySettings.vSyncCount = 1; // Set vsync to 1 (might be smart to implement other vsync modes)
+        }
+        else // If the toggle is currently not in a ticked state
+        {
+            vsync = false; // Set the reference to vsync to false
+            QualitySettings.vSyncCount = 0; // Set vsync to 0
+        }
+    }
     #endregion
     #region Sound options
     public void SetVolume()
@@ -195,12 +279,37 @@ public class MainMenuHandler : MonoBehaviour
     }
     #endregion
     #region Oyster options
-
+    public void ChangeLinesPerFrame()
+    {
+        try // Try to run the below code
+        {
+            PersistentVariables.linesPerFrame = Convert.ToInt32(linesPerFrameText.text); // Set linesPerFrame equal to the linesPerFrameText text converted to an integer
+        }
+        catch // If the above code fails to run
+        {
+            Debug.Log("Failed to convert " + linesPerFrameText.text + " to an integer."); // Inform the Unity console that something went wrong
+        }
+    }
+    public void ChangeCharactersPerSecond()
+    {
+        try // Try to run the below code
+        {
+            PersistentVariables.charactersPerSecond = float.Parse(charactersPerFrameText.text); // Set charactersPerSecond equal to charactersPerFrameText text as a float
+        }
+        catch // If the above code fails to run
+        {
+            Debug.Log("Unable to convert " + charactersPerFrameText.text + " to an integer."); // Inform the Unity console that something went wrong
+        }
+    }
+    public void ChangeSkipSpeed()
+    {
+        PersistentVariables.skipSpeed = skipSpeedSlider.value; // Set the skipSpeed value equal to the value stored within skipSpeedSlider
+    }
     #endregion
     #region Back button
     public void ReturnToMenu()
     {
-        mainMenu.SetActive(true);
+        mainMenu.SetActive(true); // Switches the menu state back to being in the main menu
         options.SetActive(false);
     }
     #endregion
@@ -208,10 +317,13 @@ public class MainMenuHandler : MonoBehaviour
     public void SaveOptions()
     {
         Options options = new Options();
-        options.qualityLevel = QualitySettings.GetQualityLevel(); // Save every option to an Options object
+        //options.qualityLevel = QualitySettings.GetQualityLevel(); // Save every option to an Options object
+        options.windowedMode = windowMode;
+        options.vsync = vsync;
         options.volume = AudioListener.volume;
         options.linesPerFrame = Convert.ToInt32(linesPerFrameText.text);
-        options.charactersPerSecond = Convert.ToInt32(charactersPerFrameText.text);
+        options.charactersPerSecond = float.Parse(charactersPerFrameText.text);
+        options.skipSpeed = skipSpeedSlider.value;
         profileHandler.SaveOptions(options); // Pass options to profilehandler for it to then be saved externally
     }
     #endregion
