@@ -1,17 +1,27 @@
+using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using TMPro;
+using UnityEditor.PackageManager.UI;
 using UnityEngine;
 using UnityEngine.Experimental.AI;
 using UnityEngine.UI;
 
 public class MainCardBattleHandler : MonoBehaviour
 {
+    #region Variables that can be accessed from inspector
+    [SerializeField]
+    private SceneStateLoader sceneStateLoader;
     [SerializeField]
     private GameObject cardBattleHUD;
     [SerializeField] // Set up a lot of variables
     private GameObject cardPrefab;
+    [SerializeField]
+    private GameObject boardPrefab;
+    [SerializeField]
+    private GameObject cardInfoPrefab;
     [SerializeField]
     private EnemyScript enemy;
     [SerializeField]
@@ -27,6 +37,23 @@ public class MainCardBattleHandler : MonoBehaviour
     private Sprite defaultPortrait;
     [SerializeField]
     private Sprite[] characterPortraits;
+    [SerializeField]
+    private Sprite defaultCardPortrait;
+    [SerializeField]
+    private Sprite[] cardPortraits;
+    #endregion
+    #region Player Variables
+    private Deck playerFullDeck;
+    private Deck playerDeck;
+    private int playerHandSize;
+    [HideInInspector]
+    public int playerCurrency;
+    private int health;
+    private int maxHealth;
+    #endregion
+    #region Enemy Variables
+    #endregion
+    #region Other
     private GameObject mainCamera;
     private GameObject playerDeckObject;
     private List<GameObject> playerCardObjects;
@@ -39,40 +66,42 @@ public class MainCardBattleHandler : MonoBehaviour
     private bool inCardBattle = false;
     private bool mouseDown = false;
     private bool drawnPhisch = false;
-    #region Player Variables
-    private Deck playerFullDeck;
-    private Deck playerDeck;
-    private int playerHandSize;
-    private int playerCurrency;
-    #endregion
-    #region Enemy Variables
-    #endregion
     private Camera mainCameraCam;
+    private bool bellClicked = false;
+    private int currentID = 0;
+    private bool showingPrompt = false;
+    private GameObject createdPrompt = null;
+    private Vector2 createdPromptSize;
+    #endregion
     private void Start()
     {
-        // Add loading playerHandSize from persistant variables
         mainCamera = Camera.main.gameObject; // Find the main camera gameObject in the scene
         mainCameraCam = Camera.main; // Find the main camera in the scene
+        inCardBattle = true;
         CardBattle();
     }
     private void Update()
     {
+        #region Stay in card battle when in card battle
         if (inCardBattle) // If a card battle is supposed to be happening
         {
             CardBattle(); // Call the CardBattle method
         }
-        if (Input.GetAxis("PrimaryAction") > 0) // If there is mouse input
-        {
-            mouseDown = true; // Set mouseDown to true
-        }
-        else // If there is no mouse input
+        #endregion
+        #region Handle mouse input
+        if (Input.GetAxis("PrimaryAction") == 0 && Input.GetAxis("SecondaryAction") == 0) // If there is no mouse input
         {
             mouseDown = false; // Set mouseDown to false
         }
+        else // If there is  mouse input
+        {
+            mouseDown = true; // Set mouseDown to true
+        }
+        #endregion
     }
     private void CardBattle()
     {
-        inCardBattle = true; // Set inCardBattle to true
+        // Set inCardBattle to true
         if (enemy.ready)
         {
             switch (currentTurn.ToLower()) // Pick which turn it is
@@ -81,15 +110,25 @@ public class MainCardBattleHandler : MonoBehaviour
                     Debug.Log("Turn type '" + currentTurn + "' not recognised."); // Inform the Unity console that the current turn does not exist
                     break;
                 case "setup": // If the turn is 'setup', A.K.A: setting up the card battle
-                    #region Create or load player deck
+                    #region Load variables from persistent variables
+                    if (PersistentVariables.matchStartingHealth != -1)
+                    {
+                        health = PersistentVariables.matchStartingHealth;
+                    }
+                    else
+                    {
+                        Debug.Log("Unable to load match starting health! Defaulting to 5");
+                        health = 5;
+                    }
+                    maxHealth = health;
                     if (PersistentVariables.matchStartingCurrency != -1)
                     {
                         playerCurrency = PersistentVariables.matchStartingCurrency;
                     }
                     else
                     {
-                        Debug.Log("Unable to load player starting currency! Defaulting to 1");
-                        playerCurrency = 1;
+                        Debug.Log("Unable to load player starting currency! Defaulting to 5");
+                        playerCurrency = 5;
                     }
                     if (PersistentVariables.handSize != -1)
                     {
@@ -129,135 +168,200 @@ public class MainCardBattleHandler : MonoBehaviour
                         playerFullDeck.cards[9] = CreateCardData("Reaper");
                         // Make code for populating enemy deck
                     }
+                    #endregion
+                    #region Populate player deck
                     playerDeck = new Deck(); // Create a new deck to store the player's hand
                     playerDeck.cards = new Card[playerHandSize]; // Initialise the deck in playerDeck to the size of the player's hand
                     playerDeck = PopulateDeck(playerFullDeck, playerHandSize, playerDeck); // Call populate deck to fill the player's deck
                     #endregion
                     #region Setup the UI
+                    UpdateHealth();
                     UpdateCurrency(playerCurrency, enemy.currency); // update to use enemy currency
                     SetPlayerPortrait("Alex");
                     SetEnemyPortrait(enemy.enemyName);
                     #endregion
-                    cardBattleHUD.SetActive(true);
-                    currentTurn = "Player"; // Set the turn to Player
+                    cardBattleHUD.SetActive(true); // Enable the card battling HUD
+                    currentTurn = "Enemy"; // Set the turn to Player
                     GenerateDeck(); // Generate the player's deck
                     break;
                 case "player": // If the current turn is player
-                               // handle mouse input from player to pick card
                     bool hitThing = false; // Create a new bool called hitThing and set it to false
-                    if (selecting) // If the player is currently selecting a card
+                    RaycastHit hit; // Create a new raycasthit object
+                    Ray ray = mainCameraCam.ScreenPointToRay(Input.mousePosition); // Create a new raycast
+                    if (Physics.Raycast(ray, out hit)) // If the raycast hits an object
                     {
-                        RaycastHit hit; // Create a new raycasthit object
-                        Ray ray = mainCameraCam.ScreenPointToRay(Input.mousePosition); // Create a new raycast
-                        if (Physics.Raycast(ray, out hit)) // If the raycast hits an object
+                        if (hit.transform.tag == "PlayerBoardSpace") // If the object has no children
                         {
-                            if (hit.transform.tag == "PlayerBoardSpace") // If the object has no children
+                            if (hit.transform.childCount == 0 && selecting) // If the object is a board space on the player's side
                             {
-                                if (hit.transform.childCount == 0) // If the object is a board space on the player's side
+                                hitThing = true; // Set hitThing to true
+                                selectedCard.transform.position = new Vector3(hit.transform.position.x, hit.transform.position.y + 0.01f, hit.transform.position.z); // Move the player's selected card to the board space they clicked on
+                                if (!mouseDown && Input.GetAxis("PrimaryAction") > 0 && playerCurrency >= selectedCardScript.cardData.cost) // If mouseDown is false and the player clicks
                                 {
-                                    hitThing = true; // Set hitThing to true
-                                    selectedCard.transform.position = new Vector3(hit.transform.position.x, hit.transform.position.y + 0.01f, hit.transform.position.z); // Move the player's selected card to the board space they clicked on
-                                    if (!mouseDown && Input.GetAxis("PrimaryAction") > 0 && playerCurrency >= selectedCardScript.cardData.cost) // If mouseDown is false and the player clicks
+                                    mouseDown = true; // Set mouseDown to true
+                                    #region Pick which space the card needs to be added to
+                                    switch (hit.transform.name) // Pick which space the player is clicking on
                                     {
-                                        mouseDown = true; // Set mouseDown to true
-                                                          // Place card on board
-                                        switch (hit.transform.name) // Pick which space the player is clicking on
-                                        {
-                                            default: // If the space is not recognised
-                                                Debug.Log("Object '" + hit.transform.name + "' not recognised."); // Inform the Unity console that the space was not recognised
-                                                boardCards[0, 0] = selectedCard;
-                                                break;
-                                            case "00":
-                                                boardCards[2, 0] = selectedCard;
-                                                break;
-                                            case "01":
-                                                boardCards[2, 1] = selectedCard; // This part pretty much explains itself
-                                                break;
-                                            case "02":
-                                                boardCards[2, 2] = selectedCard;
-                                                break;
-                                            case "03":
-                                                boardCards[2, 3] = selectedCard;
-                                                break;
-                                            case "10":
-                                                boardCards[3, 0] = selectedCard;
-                                                break;
-                                            case "11":
-                                                boardCards[3, 1] = selectedCard;
-                                                break;
-                                            case "12":
-                                                boardCards[3, 2] = selectedCard;
-                                                break;
-                                            case "13":
-                                                boardCards[3, 3] = selectedCard;
-                                                break;
-                                        }
-                                        selectedCard.transform.parent = hit.transform; // Set the card's parent to the board space it is on
-                                        playerCurrency -= selectedCardScript.cardData.cost;
-                                        UpdateCurrency(playerCurrency, enemy.currency); // update to use enemy currency
-                                        selectedCard = null; // Remove the reference to the card
-                                        selectedCardScript = null;
-                                        selecting = false; // Set selecting to false
-                                        playerDeck.cards[selectedCardIndex] = null; // Remove reference to card in playerDeck
-                                        selectedCardIndex = -1;
-                                        int i = 0; // Define i and set it to 0
-                                        foreach (Card card in playerDeck.cards) // Loop through every card in the player's deck
-                                        {
-                                            if (card != null) // If the card does exist
-                                            {
-                                                i++; // Add 1 to i
-                                            }
-                                        }
-                                        Card[] temp = new Card[i]; // Create temp and set it equal to the length of cards that did exist in the player's deck
-                                        int k = 0; // Define k and set it to 0
-                                        for (i = 0; i < playerDeck.cards.Length; i++) // Loop through every index of playerDeck.cards
-                                        {
-                                            if (playerDeck.cards[i] != null) // If the card exists
-                                            {
-                                                temp[k] = playerDeck.cards[i]; // Set the kth index of temp equal to playerDeck.cards[i]
-                                                k++; // Add 1 to k
-                                            }
-                                        }
-                                        playerDeck.cards = temp; // Set the player's deck equal to temp
-                                                                 //currentTurn = "Enemy"; <- this should switch once the player presses a button to finish their turn\
-                                        GenerateDeck(); // Generate the player's deck again
+                                        default: // If the space is not recognised
+                                            Debug.Log("Object '" + hit.transform.name + "' not recognised."); // Inform the Unity console that the space was not recognised
+                                            boardCards[0, 0] = selectedCard;
+                                            break;
+                                        case "00":
+                                            boardCards[2, 0] = selectedCard;
+                                            break;
+                                        case "01":
+                                            boardCards[2, 1] = selectedCard; // This part pretty much explains itself
+                                            break;
+                                        case "02":
+                                            boardCards[2, 2] = selectedCard;
+                                            break;
+                                        case "03":
+                                            boardCards[2, 3] = selectedCard;
+                                            break;
+                                        case "10":
+                                            boardCards[3, 0] = selectedCard;
+                                            break;
+                                        case "11":
+                                            boardCards[3, 1] = selectedCard;
+                                            break;
+                                        case "12":
+                                            boardCards[3, 2] = selectedCard;
+                                            break;
+                                        case "13":
+                                            boardCards[3, 3] = selectedCard;
+                                            break;
                                     }
-                                }
-                                else // If the raycast does not hit an object
-                                {
-                                    selectedCardScript.Select(); // Move the selected card back to its selecting position
+                                    #endregion
+                                    selectedCard.transform.parent = hit.transform; // Set the card's parent to the board space it is on
+                                    playerCurrency -= selectedCardScript.cardData.cost; // Remove the card's cost from the player's currency
+                                    UpdateCurrency(playerCurrency, enemy.currency); // update to use enemy currency
+                                    #region Set all instances of the card to be in their 'on the board' state
+                                    selectedCardScript.cardData.state = 2;
+                                    foreach (Card card in playerFullDeck.cards)
+                                    {
+                                        if (card.ID == selectedCardScript.cardData.ID)
+                                        {
+                                            card.state = 2;
+                                        }
+                                    }
+                                    #endregion
+                                    #region Remove all references to a selected card
+                                    selectedCard = null; // Remove the reference to the card
+                                    selectedCardScript = null;
+                                    selecting = false; // Set selecting to false
+                                    playerDeck.cards[selectedCardIndex] = null; // Remove reference to card in playerDeck
+                                    playerCardObjects[selectedCardIndex] = null;
+                                    selectedCardIndex = -1;
+                                    #endregion
+                                    #region Remove all null values from the player's deck and resize it
+                                    int i = 0; // Define i and set it to 0
+                                    foreach (Card card in playerDeck.cards) // Loop through every card in the player's deck
+                                    {
+                                        if (card != null) // If the card does exist
+                                        {
+                                            i++; // Add 1 to i
+                                        }
+                                    }
+                                    Card[] temp = new Card[i]; // Create temp and set it equal to the length of cards that did exist in the player's deck
+                                    int k = 0; // Define k and set it to 0
+                                    for (i = 0; i < playerDeck.cards.Length; i++) // Loop through every index of playerDeck.cards
+                                    {
+                                        if (playerDeck.cards[i] != null) // If the card exists
+                                        {
+                                            temp[k] = playerDeck.cards[i]; // Set the kth index of temp equal to playerDeck.cards[i]
+                                            k++; // Add 1 to k
+                                        }
+                                    }
+                                    playerDeck.cards = temp; // Set the player's deck equal to temp
+                                    #endregion
+                                    GenerateDeck(); // Generate the player's deck again
                                 }
                             }
-                            else // If the raycast does not hit an object
+                            else if (hit.transform.childCount == 1 && selecting)
                             {
                                 selectedCardScript.Select(); // Move the selected card back to its selecting position
+                            }
+                            else if (hit.transform.childCount == 1)
+                            {
+                                Debug.Log("SHOW CARD CAN BE SLAPPED");
+                                // HANDLE CARD SLAPPING HERE
+                                if (Input.GetAxis("SecondaryAction") > 0 && !mouseDown)
+                                {
+                                    selectedCard = hit.transform.GetChild(0).gameObject;
+                                    selectedCardScript = selectedCard.GetComponent<CardScript>();
+                                    mouseDown = true;
+                                    try
+                                    {
+                                        Debug.Log("Card slapped.");
+                                        playerCurrency += selectedCardScript.cardData.cost;
+                                        foreach (Card card in playerFullDeck.cards)
+                                        {
+                                            if (card != null && card.ID == selectedCardScript.cardData.ID)
+                                            {
+                                                card.state = 0;
+                                            }
+                                        }
+                                        GameObject.Destroy(selectedCard);
+                                        selectedCard = null;
+                                        selectedCardScript = null;
+                                        selectedCardIndex = -1;
+                                        UpdateCurrency(playerCurrency, enemy.currency);
+                                    }
+                                    catch
+                                    {
+                                        Debug.Log("Unable to slap card.");
+                                    }
+                                }
                             }
                         }
                         else // If the raycast does not hit an object
                         {
+                            try
+                            {
+                                selectedCardScript.Select(); // Move the selected card back to its selecting position
+                            }
+                            catch { }
+                        }
+                    }
+                    else // If the raycast does not hit an object
+                    {
+                        try
+                        {
                             selectedCardScript.Select(); // Move the selected card back to its selecting position
                         }
+                        catch { }
                     }
                     if (!mouseDown && Input.GetAxis("PrimaryAction") > 0 && !hitThing) // If the player clicks the mouse, mouseDown is false and the raycast did not hit a valid board space
                     {
                         selecting = false; // Set selecting to false
                         selectedCard = null; // Set selectedCard to null
                         mouseDown = true; // Set mouseDown to true
-                        for (int i = 0; i < playerCardObjects.Count; i++) // Loop through every card in the player's deck
+                        if (playerCardObjects.Count != 0)
                         {
-                            CardScript script = playerCardObjects[i].GetComponent<CardScript>(); // Find the cardScript component of the card
-                            script.Unselect(); // Unselect the card
-                            if (script.mouseIsOver) // If the mouse is over the card
+                            for (int i = 0; i < playerCardObjects.Count; i++) // Loop through every card in the player's deck
                             {
-                                // move card into placing state
-                                script.Select(); // Set the card to its selected state
-                                selecting = true; // Set selecting to true
-                                selectedCard = playerCardObjects[i]; // Set selectedCard equal to the current card
-                                selectedCardIndex = i; // Set selectedCardIndex to the current index
-                                selectedCardScript = script; // Set the selectedCardScript to script
+                                try
+                                {
+                                    CardScript script = playerCardObjects[i].GetComponent<CardScript>(); // Find the cardScript component of the card
+                                    script.Unselect(); // Unselect the card
+                                    if (script.mouseIsOver) // If the mouse is over the card
+                                    {
+                                        // move card into placing state
+                                        script.Select(); // Set the card to its selected state
+                                        selecting = true; // Set selecting to true
+                                        selectedCard = playerCardObjects[i]; // Set selectedCard equal to the current card
+                                        selectedCardIndex = i; // Set selectedCardIndex to the current index
+                                        selectedCardScript = script; // Set the selectedCardScript to script
+                                    }
+                                }
+                                catch
+                                {
+                                    Debug.Log("Leaked card at index " + i);
+                                }
                             }
                         }
                     }
+                    #region Handle if the phisch pile is clicked on
                     if (phischScript.bellClicked) // If the phisch pile is clicked
                     {
                         if (!drawnPhisch && Input.GetAxis("PrimaryAction") > 0) // If a phisch hasn't been drawn and the mouse is held
@@ -274,20 +378,522 @@ public class MainCardBattleHandler : MonoBehaviour
                             GenerateDeck(); // Re-generate the player's deck
                         }
                     }
-                    if (bellScript.bellClicked) // If the bell is clicked
+                    #endregion
+                    #region Handle if the bell is clicked on
+                    if (bellScript.bellClicked && !bellClicked) // If the bell is clicked
                     {
                         // play a ding sound here
-                        currentTurn = "Enemy"; // Switch to the enemy's turn
+                        currentTurn = "ComputeTurn"; // Switch to the enemy's turn
                         drawnPhisch = false; // Set drawnPhisch to false
+                        bellClicked = true;
                     }
+                    #endregion
                     break;
                 case "enemy": // If the current turn is enemy
                     enemy.ComputeTurn(boardCards);// pass script onto enemy script for turn
-                    // make way to apply changes to board
-                    currentTurn = "Player";
-                    break; // From here some way for the enemy's changes to the array needs to be applied to the main board
+                    bellClicked = false; // Set bellClicked to false
+                    currentTurn = "Player"; // Switch the turn to computeTurn
+                    break;
+                case "computeturn":
+                    currentTurn = "Enemy"; // Set turn to enemy
+                    playerDeck = PopulateDeck(playerFullDeck, playerHandSize, playerDeck); // Populate the player deck <- figure out why this doesn't work
+                    int column = 0;
+                    GameObject playerFrontCard = null;
+                    GameObject playerBackCard = null; // Setup some variables for later use
+                    GameObject enemyFrontCard = null;
+                    GameObject enemyBackCard = null;
+                    int[] columnState = new int[4] { 0, 0, 0, 0 };
+                    for (int row = 0; row < boardCards.Length; row++) // Loop through every row
+                    {
+                        if (row - (column * 4) == 4) // If row is a multiple of 4
+                        {
+                            CalculateAttack(column, columnState, new GameObject[4] { enemyBackCard, enemyFrontCard, playerFrontCard, playerBackCard }); // Call function to calculate the attack
+                            column++; // Add 1 to column
+                        }
+                        switch (row - (column * 4)) // Switch between row - column * 4
+                        {
+                            default: // If none of the below cases match
+                                Debug.Log("Board space (" + (row - (column * 4)) + "," + column + ") not recognised."); // Inform the Unity console that something went wrong
+                                break;
+                            case 0: // enemy back space
+                                if (boardCards[(row - (column * 4)), column] != null) // Check the space isn't empty
+                                {
+                                    enemyBackCard = boardCards[(row - (column * 4)), column];
+                                    //Debug.Log("Found enemy back card '" + enemyBackCard.name + ":" + enemyBackCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
+                                    columnState[0] = 1;
+                                }
+                                else // Otherwise
+                                {
+                                    enemyBackCard = null;
+                                    columnState[0] = 0; // Set card to null
+                                }
+                                break;
+                            case 1: // enemy front space
+                                if (boardCards[(row - (column * 4)), column] != null) // Check the space isn't empty
+                                {
+                                    enemyFrontCard = boardCards[(row - (column * 4)), column];
+                                    //Debug.Log("Found enemy front card '" + enemyFrontCard.name + ":" + enemyFrontCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
+                                    columnState[1] = 1;
+                                }
+                                else // Otherwise
+                                {
+                                    enemyFrontCard = null;
+                                    columnState[1] = 0; // Set card to null
+                                }
+                                break;
+                            case 2: // player front space
+                                if (boardCards[(row - (column * 4)), column] != null) // Check the space isn't empty
+                                {
+                                    playerFrontCard = boardCards[(row - (column * 4)), column];
+                                    //Debug.Log("Found player front card '" + playerFrontCard.name + ":" + playerFrontCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
+                                    columnState[2] = 1;
+                                }
+                                else // Otherwise
+                                {
+                                    playerFrontCard = null;
+                                    columnState[2] = 0; // Set card to null
+                                }
+                                break;
+                            case 3: // player back space
+                                if (boardCards[(row - (column * 4)), column] != null) // Check the space isn't empty
+                                {
+                                    playerBackCard = boardCards[(row - (column * 4)), column];
+                                    //Debug.Log("Found player back card '" + playerBackCard.name + ":" + playerBackCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
+                                    columnState[3] = 1;
+                                }
+                                else // Otherwise
+                                {
+                                    playerBackCard = null;
+                                    columnState[3] = 0; // Set card to null
+                                }
+                                break;
+                        }
+                    }
+                    CalculateAttack(column, columnState, new GameObject[4] { enemyBackCard, enemyFrontCard, playerFrontCard, playerBackCard }); // Calculate attack again
+                    foreach (GameObject card in boardCards)
+                    {
+                        if (card != null)
+                        {
+                            CardScript cardScript = card.GetComponent<CardScript>();
+                            if (cardScript.cardData.name.ToLower() == "phisch")
+                            {
+                                cardScript.cardData.cost++;
+                                cardScript.cardData.maxCost = cardScript.cardData.cost; // This doesn't need any health calculations as fish max hp is 1
+                                cardScript.UpdateCost();
+                            }
+                        }
+                    }
+                    GenerateDeck(); // Re-generate the deck
+                    // this is where the card battle ends
+                    if (enemy.health <= 0) // If the enemy runs out of health
+                    { // Player wins
+                        currentTurn = "PlayerWin"; // Switch turn to playerWin
+                    }
+                    else if (health <= 0) // If the player health runs out of health
+                    { // Enemy wins
+                        currentTurn = "EnemyWin"; // Switch turn to enemyTurn
+                    }
+                    break;
+                case "playerwin":
+                    // Show player winning screen
+                    currentTurn = "EndGame";
+                    break;
+                case "enemywin":
+                    // Show enemy winning screen
+                    currentTurn = "EndGame";
+                    break;
+                case "endgame":
+                    inCardBattle = false; // Set inCardBattle to false
+                    cardBattleHUD.SetActive(false); // Hide and remove any card battling objects
+                    GameObject.Destroy(playerDeckObject);
+                    // remove cards from the board here
+                    try // Try to run the below code
+                    {
+                        // v Load profile v
+                        ProfileData profile = JsonUtility.FromJson<ProfileData>(File.ReadAllText(PersistentVariables.documentsPath + @"\My Games\LimboLane\Profiles\" + PersistentVariables.profileName + ".json"));
+                        foreach (ObjectState location in profile.locationStates) // Loop through every location
+                        {
+                            if (location.name == profile.location) // If the location name matches the profile location
+                            {
+                                location.state++; // Bump locationState by 1
+                            }
+                        }
+                    }
+                    catch // If the above code fails to run
+                    {
+                        Debug.Log("Unable to bump scene state!"); // Inform the Unity console that something went wrong
+                    }
+                    Vector3 position = board.transform.position;
+                    Quaternion rotation = board.transform.rotation; // Store the position data for the board
+                    Vector3 scale = board.transform.localScale;
+                    GameObject.Destroy(board); // Destroy the board
+                    board = Instantiate(boardPrefab, position, rotation); // Create a new instance of the board
+                    board.transform.localScale = scale;
+                    try // Try to run the below code
+                    {
+                        // Fetch bell and phisch script from new board object
+                    }
+                    catch // If the below code cannot run
+                    {
+                        Debug.Log("Unable to fetch required objects from board!"); // Inform the Unity console that something went wrong
+                    }
+                    try // Try to run the below code
+                    {
+                        sceneStateLoader.Run(); // Load the new scene state
+                    }
+                    catch // If the above code fails to run
+                    {
+                        Debug.Log("Unable to continue since sceneStateLoader does not exist!"); // Inform the Unity console that something went wrong
+                    }
+                    currentTurn = "Setup"; // Set the currentTurn to setup
+                    break;
+            }
+            Vector2 screenSize = new Vector2(Camera.main.scaledPixelWidth, Camera.main.scaledPixelHeight);
+            float mousePositionScaleX = Screen.currentResolution.width / screenSize.x;
+            float mousePositionScaleY = mousePositionScaleX;
+            if (Input.mousePosition.x >= 0 && Input.mousePosition.y >= 0 && Input.mousePosition.x <= screenSize.x && Input.mousePosition.y <= screenSize.y) // check if mouse is actually in game window
+            {
+                RaycastHit hitCard; // Create a new raycasthit object
+                Ray cardRay = mainCameraCam.ScreenPointToRay(Input.mousePosition); // Create a new raycast
+                if (Physics.Raycast(cardRay, out hitCard))
+                {
+                    ShowCardInfo(hitCard, screenSize, mousePositionScaleX, mousePositionScaleY); // figure out why this doesn't work
+                }
+                else
+                {
+                    HideCardInfo();
+                }
             }
         }
+    }
+    private void ShowCardInfo(RaycastHit card, Vector2 screenSize, float mousePositionScaleX, float mousePositionScaleY)
+    {
+        if ((card.transform.tag.ToLower() == "enemyboardspace" || card.transform.tag.ToLower() == "playerboardspace"))
+        {
+            try
+            {
+                GameObject cardObject = card.transform.GetChild(0).gameObject;
+                CardScript cardScript = cardObject.transform.GetComponent<CardScript>();
+                if (cardScript.cardData.state == 2)
+                {
+                    // If the mouse is hovering over any card
+                    Vector3 promptPosition = new Vector3();
+                    switch (showingPrompt) // this code needs fixing, for some reason mouse position is not relative to game window
+                    {
+                        case true:
+                            if (Input.mousePosition.x > (screenSize.x / 2))// mouse is on right side of screen
+                            {
+                                if (Input.mousePosition.y > (screenSize.y / 2)) // mouse is at top of screen
+                                {
+                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) - (createdPromptSize.x / 2) - 1;
+                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) - (createdPromptSize.y / 2) - 1;
+                                }
+                                else // mouse is at bottom of screen
+                                {
+                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) - (createdPromptSize.x / 2) - 1;
+                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) + (createdPromptSize.y / 2) + 1;
+                                }
+                            }
+                            else // mouse is on left side of screen
+                            {
+                                if (Input.mousePosition.y > (screenSize.y / 2)) // mouse is at top of screen
+                                {
+                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) + (createdPromptSize.x / 2) + 1;
+                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) - (createdPromptSize.y / 2) - 1;
+                                }
+                                else // mouse is at bottom of screen
+                                {
+                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) + (createdPromptSize.x / 2) + 1;
+                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) + (createdPromptSize.y / 2) + 1;
+                                }
+                            }
+                            promptPosition.x -= Screen.currentResolution.width / 2;
+                            promptPosition.y -= Screen.currentResolution.height / 2;
+                            promptPosition.z = 0;
+                            createdPrompt.transform.localPosition = promptPosition;
+                            createdPrompt.transform.localScale = new Vector3(1, 1, 1);
+                            break;
+                        case false:
+                            showingPrompt = true;
+                            createdPrompt = Instantiate(cardInfoPrefab, new Vector3(0, 0, 0), Quaternion.Euler(new Vector3(0, 0, 0)));
+                            createdPromptSize = createdPrompt.GetComponent<RectTransform>().sizeDelta;
+                            createdPrompt.transform.SetParent(cardBattleHUD.transform);
+                            createdPrompt.transform.localScale = new Vector3(1, 1, 1);
+                            createdPrompt.transform.Find("CardTitleDetails").Find("CardName").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.name.ToString();
+                            createdPrompt.transform.Find("CardTitleDetails").Find("Health").Find("HealthText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.health.ToString();
+                            createdPrompt.transform.Find("CardTitleDetails").Find("Attack").Find("AttackText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.attack.ToString();
+                            createdPrompt.transform.Find("CardTitleDetails").Find("Cost").Find("CostText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.cost.ToString();
+                            createdPrompt.transform.Find("CardAbilityDescription").Find("AbilityText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.description.ToString();
+                            bool found = false;
+                            foreach (Sprite portrait in cardPortraits)
+                            {
+                                if (portrait.name == cardScript.cardData.name)
+                                {
+                                    createdPrompt.transform.Find("CardSprite").GetComponent<Image>().sprite = portrait;
+                                    found = true;
+                                }
+                            }
+                            if (!found)
+                            {
+                                createdPrompt.transform.Find("CardSprite").GetComponent<Image>().sprite = defaultCardPortrait;
+                            }
+                            if (Input.mousePosition.x > (screenSize.x / 2))// mouse is on right side of screen
+                            {
+                                if (Input.mousePosition.y > (screenSize.y / 2)) // mouse is at top of screen
+                                {
+                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) - (createdPromptSize.x / 2) - 1;
+                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) - (createdPromptSize.y / 2) - 1;
+                                }
+                                else // mouse is at bottom of screen
+                                {
+                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) - (createdPromptSize.x / 2) - 1;
+                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) + (createdPromptSize.y / 2) + 1;
+                                }
+                            }
+                            else // mouse is on left side of screen
+                            {
+                                if (Input.mousePosition.y > (screenSize.y / 2)) // mouse is at top of screen
+                                {
+                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) + (createdPromptSize.x / 2) + 1;
+                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) - (createdPromptSize.y / 2) - 1;
+                                }
+                                else // mouse is at bottom of screen
+                                {
+                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) + (createdPromptSize.x / 2) + 1;
+                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) + (createdPromptSize.y / 2) + 1;
+                                }
+                            }
+                            promptPosition.z = 0;
+                            createdPrompt.transform.localPosition = promptPosition;
+                            createdPrompt.transform.localScale = new Vector3(1, 1, 1);
+                            break;
+                    }
+                }
+            }
+            catch
+            {
+                Debug.Log("Unable to find card!");
+            }
+        }
+    }
+    private void HideCardInfo()
+    {
+        if (showingPrompt)
+        {
+            try
+            {
+                GameObject.Destroy(createdPrompt);
+                showingPrompt = false;
+                createdPrompt = null;
+                createdPromptSize = new Vector2();
+            }
+            catch
+            {
+                Debug.Log("Unable to find prompt in scene.");
+            }
+        }
+    }
+    private (Card, Card) DoAttack(Card attackingCard, Card defendingCard)
+    {
+        System.Random random = new System.Random();
+        int damageDealt = attackingCard.attack;
+        bool crit = false;
+        switch (attackingCard.ability)
+        {
+            default:
+                Debug.Log("Ability " + attackingCard.ability + " not recognised on attacking card.");
+                break;
+            case 0: // 25% chance to crit
+                if (random.Next(0,100) < 25)
+                {
+                    damageDealt = damageDealt * 2;
+                    crit = true;
+                    Debug.Log("Did crit");
+                }
+                break;
+        }
+        switch (defendingCard.ability)
+        {
+            default:
+                Debug.Log("Ability " + defendingCard.ability + " not recognised on defending card.");
+                break;
+            case 2: // reflect damage
+                if (random.Next(0, 100) < 10)
+                {
+                    defendingCard.health += damageDealt;
+                    attackingCard.health -= damageDealt;
+                    Debug.Log("Reflected damage");
+                }
+                break;
+            case 3: // immune to crits
+                if (crit)
+                {
+                    Debug.Log("Blocked crit");
+                    damageDealt = damageDealt / 2;
+                }
+                break;
+        }
+        defendingCard.health -= damageDealt;
+        return (attackingCard, defendingCard);
+    }
+    private void CalculateAttack(int column, int[] columnState, GameObject[] columnCardsObj)
+    {
+        string state = "";
+        foreach (int i in columnState)
+        {
+            state += i.ToString();
+        }
+        Card[] columnCards = new Card[columnCardsObj.Length];
+        for (int i = 0; i < columnCards.Length; i++)
+        {
+            if (columnCardsObj[i] != null)
+            {
+                columnCards[i] = columnCardsObj[i].GetComponent<CardScript>().cardData;
+            }
+            else
+            {
+                columnCards[i] = null;
+            }
+        }
+        switch (state)
+        {
+            default:
+                Debug.Log("No cards on board at column " + column + " so nothing happened. (" + state + ")");
+                break;
+            case "0001": // player has back card
+                Debug.Log("Player back card cannot reach enemy player on column " + column + " so nothing happened. (" + state + ")");
+                break;
+            case "0010": // player has front card
+                Debug.Log("Player front card can reach enemy player on column " + column + " so enemy player takes damage. (" + state + ")");
+                enemy.health -= columnCards[2].attack;
+                break;
+            case "0100": // enemy has front card
+                Debug.Log("Enemy front card can reach player player on column " + column + " so player player takes damage. (" + state + ")");
+                health -= columnCards[1].attack;
+                break;
+            case "1000": // enemy has back card
+                Debug.Log("Enemy back card cannot reach player player on column " + column + " so nothing happened. (" + state + ")");
+                break;
+            case "0011": // player has front and back card
+                Debug.Log("Player front card can reach enemy player and player back card is blocked by front card on column " + column + " so the enemy player takes damage. (" + state + ")");
+                enemy.health -= columnCards[2].attack;
+                break;
+            case "0101": // player has back card and enemy has front card
+                Debug.Log("Player has back card that can reach enemy front card on column " + column + " so player back card and enemy front card hit each other (" + state + ")");
+                (columnCards[3], columnCards[1]) = DoAttack(columnCards[3], columnCards[1]);
+                if (columnCards[1].health > 0)
+                {
+                    (columnCards[1], columnCards[3]) = DoAttack(columnCards[1], columnCards[3]);
+                }
+                break;
+            case "1001": // player has back card and enemy has back card
+                Debug.Log("Player has back card that can reach enemy back card on column " + column + " so player back card and enemy back card hit each other. (" + state + ")");
+                (columnCards[3], columnCards[0]) = DoAttack(columnCards[3], columnCards[0]);
+                if (columnCards[0].health > 0)
+                {
+                    (columnCards[0], columnCards[3]) = DoAttack(columnCards[0], columnCards[3]);
+                }
+                break;
+            case "0110": // player has front card and enemy has front card
+                Debug.Log("Player has front card that can reach enemy front card on column " + column + " so the player front card and enemy front card hit each other. (" + state + ")");
+                (columnCards[2], columnCards[1]) = DoAttack(columnCards[2], columnCards[1]);
+                if (columnCards[1].health > 0)
+                {
+                    (columnCards[1], columnCards[2]) = DoAttack(columnCards[1], columnCards[2]);
+                }
+                break;
+            case "1010": // player has front card and enemy has back card
+                Debug.Log("Player has front card that can reach enemy back card on column " + column + " so the player front card and enemy back card hit each other. (" + state + ")");
+                (columnCards[2], columnCards[0]) = DoAttack(columnCards[2], columnCards[0]);
+                if (columnCards[0].health > 0)
+                {
+                    (columnCards[0], columnCards[2]) = DoAttack(columnCards[0], columnCards[2]);
+                }
+                break;
+            case "1100": // enemy has front and back card
+                Debug.Log("Enemy has front card that can reach player and enemy has back card blocked by front card on column " + column + " so the enemy front card damages the player. (" + state + ")");
+                health -= columnCards[1].attack;
+                break;
+            case "0111": // player has front and back card and enemy has front card
+                Debug.Log("Player has front card that can reach enemy front card and player has back card that is blocked by front card on column " + column + " so the player front card and enemy front card damage each other. (" + state + ")");
+                (columnCards[2], columnCards[1]) = DoAttack(columnCards[2], columnCards[1]);
+                if (columnCards[1].health > 0)
+                {
+                    (columnCards[1], columnCards[2]) = DoAttack(columnCards[1], columnCards[2]);
+                }
+                break;
+            case "1011": // player has front and back card and enemy has back card
+                Debug.Log("Player has front card that can reach enemy back card and player has back card that is blocked by front card on column " + column + " so the player front card and enemy back card hit each other. (" + state + ")");
+                (columnCards[2], columnCards[0]) = DoAttack(columnCards[2], columnCards[0]);
+                if (columnCards[0].health > 0)
+                {
+                    (columnCards[0], columnCards[2]) = DoAttack(columnCards[0], columnCards[2]);
+                }
+                break;
+            case "1101": // enemy has front and back card and player has back card
+                Debug.Log("Player has back card that can reach enemy front card and enemy back card is blocked by front card on column " + column + " so the player back card and enemy front card hit each other. (" + state + ")");
+                (columnCards[3], columnCards[1]) = DoAttack(columnCards[3], columnCards[1]);
+                if (columnCards[1].health > 0)
+                {
+                    (columnCards[1], columnCards[3]) = DoAttack(columnCards[1], columnCards[3]);
+                }
+                break;
+            case "1110": // enemy has front and back card and player has front card
+                Debug.Log("Player has front card that can reach enemy front card and enemy has back card blocked by front card on column " + column + " so the enemy front card and player front card hit each other. (" + state + ")");
+                (columnCards[2], columnCards[1]) = DoAttack(columnCards[2], columnCards[1]);
+                if (columnCards[1].health > 0)
+                {
+                    (columnCards[1], columnCards[2]) = DoAttack(columnCards[1], columnCards[2]);
+                }
+                break;
+            case "1111": // enemy has front and back card and player has front and back card
+                Debug.Log("Player has front card that can reach enemy front card and enemy has back card blocked by front card and player has back card blocked by front card on column " + column + " so the enemy front card and player front card hit each other. (" + state + ")");
+                (columnCards[2], columnCards[1]) = DoAttack(columnCards[2], columnCards[1]);
+                if (columnCards[1].health > 0)
+                {
+                    (columnCards[1], columnCards[2]) = DoAttack(columnCards[1], columnCards[2]);
+                }
+                break;
+                
+        }
+        for (int j = 0; j < columnCardsObj.Length; j++)
+        {
+            if (columnCardsObj[j] != null)
+            {
+                columnCardsObj[j].transform.Find("Health").GetComponent<TextMeshPro>().text = columnCards[j].health.ToString();
+                float maxCost = columnCards[j].maxCost;
+                float maxHealth = columnCards[j].maxHealth;
+                float health = columnCards[j].health;
+                columnCards[j].cost = Convert.ToInt32((maxCost * (health / maxHealth)));
+                columnCardsObj[j].transform.Find("Cost").GetComponent<TextMeshPro>().text = columnCards[j].cost.ToString();
+                if (columnCards[j].health <= 0)
+                {
+                    GameObject.Destroy(columnCardsObj[j]);
+                    columnCardsObj[j] = null;
+                    if (j < 2) // Card is enemy card
+                    {
+                        foreach (Card card in enemy.fullDeck.cards)
+                        {
+                            if (columnCards[j].ID == card.ID)
+                            {
+                                card.state = 0;
+                            }
+                        }
+                    }
+                    else // Card is friendly card
+                    {
+                        foreach (Card card in playerFullDeck.cards)
+                        {
+                            if (columnCards[j].ID == card.ID)
+                            {
+                                card.state = 0;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        UpdateHealth();
     }
     private void GenerateDeck()
     {
@@ -396,7 +1002,11 @@ public class MainCardBattleHandler : MonoBehaviour
     }
     public Card CreateCardData(string cardName)
     {
+        #region Create card object and set its ID
         Card outputCard = new Card(); // Create a new card
+        outputCard.ID = currentID;
+        currentID++;
+        #endregion
         #region Load card data based on name
         switch (cardName.ToLower()) // Create card data based on the provided name
         {
@@ -405,6 +1015,7 @@ public class MainCardBattleHandler : MonoBehaviour
                 break;
             case "reaper": // If the name is reaper
                 outputCard.name = "Reaper";
+                outputCard.ability = 0;
                 outputCard.description = "25% chance to deal a critical hit when attacking.";
                 outputCard.materialName = "Reaper";
                 outputCard.health = 2;
@@ -414,6 +1025,7 @@ public class MainCardBattleHandler : MonoBehaviour
                 break;
             case "phisch": // If the name is phisch
                 outputCard.name = "Phisch";
+                outputCard.ability = 1;
                 outputCard.description = "Appreciates in price by one chip every turn.";
                 outputCard.materialName = "Phisch";
                 outputCard.health = 1;
@@ -423,6 +1035,7 @@ public class MainCardBattleHandler : MonoBehaviour
                 break;
             case "dusk": // If the name is dusk
                 outputCard.name = "Dusk";
+                outputCard.ability = 2;
                 outputCard.description = "10% chance to reflect damage when being hit.";
                 outputCard.materialName = "Dusk";
                 outputCard.health = 3;
@@ -432,6 +1045,7 @@ public class MainCardBattleHandler : MonoBehaviour
                 break;
             case "rock": // If the name is rock
                 outputCard.name = "Rock";
+                outputCard.ability = 3;
                 outputCard.description = "Immune to critical hits.";
                 outputCard.materialName = "Rock";
                 outputCard.health = 6;
@@ -440,11 +1054,28 @@ public class MainCardBattleHandler : MonoBehaviour
                 outputCard.state = 0;
                 break;
         }
+        outputCard.maxCost = outputCard.cost;
+        outputCard.maxHealth = outputCard.health;
         #endregion
         return outputCard; // Return the created card
     }
-    public Deck PopulateDeck(Deck fullDeck, int handSize, Deck currentDeck) // !!!Need to add size and deck adding checks for if the card is already on the board
+    public Deck PopulateDeck(Deck fullDeck, int handSize, Deck currentDeck)
     {
+        #region Check how many spare spaces there are in deck and how many spare cards there are in fullDeck
+        Deck tempDeck = currentDeck;
+        currentDeck = new Deck();
+        if (handSize > tempDeck.cards.Length)
+        {
+            currentDeck.cards = new Card[handSize];
+            for (int i = 0; i < tempDeck.cards.Length; i++)
+            {
+                currentDeck.cards[i] = tempDeck.cards[i];
+            }
+        }
+        else
+        {
+            currentDeck.cards = tempDeck.cards;
+        }
         int l = 0; // Create l and set it to 0
         foreach (Card card in fullDeck.cards) // Loop through every card in fullDeck
         {
@@ -453,7 +1084,17 @@ public class MainCardBattleHandler : MonoBehaviour
                 l++; // Add 1 to l
             }
         }
-        if (l >= currentDeck.cards.Length) // If l is larger than or equal to the currentDeck max size
+        int m = 0;
+        foreach (Card card in currentDeck.cards)
+        {
+            if (card == null)
+            {
+                m++;
+            }
+        }
+        #endregion
+        #region If there are more sparce cards in fullDeck than spare spaces in deck
+        if (l >= m) // if the number of free cards in fullDeck is more than the number of free cards in deck
         {
             System.Random random = new System.Random(); // Create a new random
             List<int> usedIndexes = new List<int>(); // Create a list of used indexes
@@ -473,11 +1114,13 @@ public class MainCardBattleHandler : MonoBehaviour
                 }
             }
         }
+        #endregion
+        #region If there are more spare spaces in deck than spare cards in fullDeck
         else // If the current deck is larger than l
         {
             Debug.Log("Cannot fully populate deck when fullDeck is less than the currentDeck!"); // Inform the Unity console that something has gone very wrong
             int i = 0;
-            Card[] temp = new Card[fullDeck.cards.Length]; // Code below here simply fills in currentDeck with every card that is left in fullDeck
+            Card[] temp = new Card[fullDeck.cards.Length + currentDeck.cards.Length]; // Code below here simply fills in currentDeck with every card that is left in fullDeck
             for (int k = 0; k < currentDeck.cards.Length; k++)
             {
                 if (currentDeck.cards[k] != null)
@@ -496,13 +1139,24 @@ public class MainCardBattleHandler : MonoBehaviour
                 }
             }
         }
+        #endregion
         return currentDeck; // Return currentDeck
     }
-    private void UpdateCurrency(int playerCurrency, int enemyCurrency) // Finds the enemy and player currency text and updates them with provided values
+    #region Functions for updating the UI
+    public void UpdateCurrency(int playerCurrency, int enemyCurrency) // Finds the enemy and player currency text and updates them with provided values
     {
         cardBattleHUD.transform.Find("PlayerInfo").Find("Currency").Find("CurrencyText").GetComponent<TextMeshProUGUI>().text = playerCurrency.ToString();
         cardBattleHUD.transform.Find("EnemyInfo").Find("Currency").Find("CurrencyText").GetComponent<TextMeshProUGUI>().text = enemyCurrency.ToString();
     }
+    private void UpdateHealth()
+    {
+        float h = health;
+        float maxH = maxHealth;
+        cardBattleHUD.transform.Find("PlayerInfo").Find("Health").Find("HealthText").GetComponent<TextMeshProUGUI>().text = health.ToString();
+        cardBattleHUD.transform.Find("PlayerInfo").Find("Health").Find("Health").GetComponent<Image>().fillAmount = h / maxH;
+        enemy.UpdateHealth(cardBattleHUD);
+    }
+    #region Functions for handling portraits
     private void SetPlayerPortrait(string name)
     {
         SetPortrait(name, "PlayerInfo"); // Set the player's portrait to the portrait of name
@@ -514,6 +1168,7 @@ public class MainCardBattleHandler : MonoBehaviour
     private void SetPortrait(string name, string parentName)
     {
         bool success = false; // Create succcess and make it false
+        #region Try to find and set the specified portrait
         foreach (Sprite portrait in characterPortraits) // Loop through every portrait in the array of portraits
         {
             if (portrait.name == name) // If the name of the portrait matches name
@@ -530,10 +1185,15 @@ public class MainCardBattleHandler : MonoBehaviour
                 }
             }
         }
+        #endregion
+        #region If the portrait could not be set
         if (!success) // If the script failed in any way
         {
             Debug.Log("Unable to find requested portrait! (" + name + ")"); // Inform the Unity console that the portrait could not be found
             cardBattleHUD.transform.Find(parentName).Find("Icon").GetComponent<Image>().sprite = defaultPortrait; // Set the icon to the default icon
         }
+        #endregion
     }
+    #endregion
+    #endregion
 }

@@ -8,6 +8,7 @@ TagManager:
   - EnemyBoardSpace
   - EndTurnObject
   - PhischPile
+  - Card
   layers:
   - Default
   - TransparentFX

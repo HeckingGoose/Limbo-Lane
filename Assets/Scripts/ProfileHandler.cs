@@ -17,6 +17,10 @@ public class ProfileHandler : MonoBehaviour
     public string windowedMode;
     public bool vsync;
     public int maxTextureSize;
+    public int resWidth;
+    public int resHeight;
+    public int refreshRate;
+    public float renderScale;
     private void Start()
     {
         DoChecks(); // Do required checks
@@ -83,6 +87,10 @@ public class ProfileHandler : MonoBehaviour
             windowedMode = options.windowedMode;
             vsync = options.vsync;
             maxTextureSize = options.maxTextureSize;
+            resWidth = options.resWidth;
+            resHeight = options.resHeight;
+            refreshRate = options.refreshRate;
+            renderScale = options.renderScale;
             if (vsync) // Pick whether to use vsync or not
             {
                 QualitySettings.vSyncCount = 1;
@@ -98,12 +106,15 @@ public class ProfileHandler : MonoBehaviour
                     break;
                 case "borderless window":
                     Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
+                    Screen.SetResolution(resWidth, resHeight, FullScreenMode.FullScreenWindow, refreshRate);
                     break;
                 case "exclusive fullscreen":
                     Screen.fullScreenMode = FullScreenMode.ExclusiveFullScreen;
+                    Screen.SetResolution(resWidth, resHeight, FullScreenMode.ExclusiveFullScreen, refreshRate);
                     break;
                 case "windowed":
                     Screen.fullScreenMode = FullScreenMode.Windowed;
+                    Screen.SetResolution(resWidth, resHeight, FullScreenMode.Windowed, refreshRate);
                     break;
             }
         }
@@ -137,13 +148,18 @@ public class ProfileHandler : MonoBehaviour
             // Create file
             Options options = new Options();
             //options.qualityLevel = QualitySettings.GetQualityLevel();
-            options.windowedMode = "Windowed";
+            Resolution resolution = Screen.resolutions[Screen.resolutions.Length - 1];
+            options.resHeight = resolution.height;
+            options.resWidth = resolution.width;
+            options.refreshRate = resolution.refreshRate;
+            options.renderScale = 1;
+            options.windowedMode = "Borderless Window";
             options.volume = AudioListener.volume;
-            options.linesPerFrame = 5;
-            options.charactersPerSecond = 2;
+            options.linesPerFrame = 20;
+            options.charactersPerSecond = 10;
             options.skipSpeed = 0.1f;
-            options.vsync = false;
-            options.maxTextureSize = 2048;
+            options.vsync = true;
+            options.maxTextureSize = 0;
             File.WriteAllText(documentsPath + @"\My Games\LimboLane\options.json", JsonUtility.ToJson(options));
             Debug.Log("File options.json does not exist! Creating file...");
         }
@@ -156,6 +172,7 @@ public class ProfileHandler : MonoBehaviour
         PersistentVariables.profileName = profileData.name;
         PersistentVariables.profileVersion = profileData.version;
         PersistentVariables.profileCurrency = profileData.currency; // Simply takes variables from this script and pushes them to PersistentVariables
+        PersistentVariables.matchStartingHealth = profileData.matchStartingHealth;
         PersistentVariables.matchStartingCurrency = profileData.matchStartingCurrency; // This method is called when a game is made or loaded
         PersistentVariables.profileLocation = profileData.location;
         PersistentVariables.handSize = profileData.handSize;
@@ -171,6 +188,7 @@ public class ProfileHandler : MonoBehaviour
         profile.version = "1.0";
         profile.location = "AlexHouse";
         profile.currency = 0;
+        profile.matchStartingHealth = 7;
         profile.matchStartingCurrency = 3;
         profile.deck = new string[4]; // Defines a bunch of default values for a profile and then returns the created profile
         profile.deck[0] = "Reaper";

@@ -695,7 +695,7 @@ GameObject:
   - component: {fileID: 6825226928618423460}
   m_Layer: 0
   m_Name: Card
-  m_TagString: Untagged
+  m_TagString: Card
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -781,13 +781,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mouseIsOver: 0
+  disabled: 0
   cardData:
     name: 
+    description: 
     materialName: 
     health: 0
+    maxHealth: 0
     attack: 0
     state: 0
+    ID: 0
     cost: 0
+    maxCost: 0
 --- !u!65 &6825226928618423460
 BoxCollider:
   m_ObjectHideFlags: 0

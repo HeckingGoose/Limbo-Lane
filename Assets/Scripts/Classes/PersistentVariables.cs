@@ -6,6 +6,7 @@ public class PersistentVariables // Tell Unity that this is a class
     public static string profileName = ""; // Name of current profile being used
     public static string profileVersion = "";
     public static int profileCurrency = -1;
+    public static int matchStartingHealth = -1;
     public static int matchStartingCurrency = -1;
     public static string profileLocation = "";
     public static int handSize = -1;

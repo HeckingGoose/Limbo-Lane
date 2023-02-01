@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine; // Reference required assemblies
+using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
 public class MainMenuHandler : MonoBehaviour
@@ -35,17 +36,30 @@ public class MainMenuHandler : MonoBehaviour
     //[SerializeField]
     //private TMP_Dropdown qualityDropdown;
     [SerializeField]
+    private TMP_Dropdown resolutionsDropdown;
+    private Resolution[] resolutions;
+    private int resWidth;
+    private int resHeight;
+    private int refreshRate;
+    [SerializeField]
     private TMP_Dropdown windowModeDropdown;
     [SerializeField]
     private Toggle vsyncToggle;
     [SerializeField]
     private Slider maxTextureSizeSlider;
     [SerializeField]
+    private Slider renderScaleSlider;
+    [SerializeField]
+    private TextMeshProUGUI renderScaleText;
+    [SerializeField]
+    private UniversalRenderPipelineAsset renderPipelineAsset;
+    [SerializeField]
     private TextMeshProUGUI maxTextureSizeText;
-    private string[] availableQualitySettings;
+    //private string[] availableQualitySettings;
     private string windowMode;
     private bool vsync;
     private int maxTextureSize;
+    private float renderScale;
     #endregion
     #region Sound options objects
     [SerializeField]
@@ -69,6 +83,28 @@ public class MainMenuHandler : MonoBehaviour
     void Start() // On script start
     {
         profileHandler.DoChecks(); // Ensure that the profile handler has done its checks
+        resolutions = Screen.resolutions;
+        List<Sprite> temp = new List<Sprite>();
+        foreach (Resolution resolution in resolutions)
+        {
+            temp.Add(null);
+        }
+        resolutionsDropdown.AddOptions(temp);
+        resHeight = profileHandler.resHeight;
+        resWidth = profileHandler.resWidth;
+        refreshRate = profileHandler.refreshRate;
+        renderScale = profileHandler.renderScale;
+        renderScaleSlider.value = profileHandler.renderScale;
+        renderPipelineAsset.renderScale = renderScale;
+        renderScaleText.text = Convert.ToInt32(renderScale * 100).ToString() + "%";
+        for (int i = 0; i < resolutions.Length; i++)
+        {
+            resolutionsDropdown.options[i].text = resolutions[i].width.ToString() + " x " + resolutions[i].height.ToString() + " @ " + resolutions[i].refreshRate;
+            if (resolutions[i].width == resWidth && resolutions[i].height == resHeight && resolutions[i].refreshRate == refreshRate)
+            {
+                resolutionsDropdown.value = i;
+            }
+        }
         windowMode = profileHandler.windowedMode;
         vsync = profileHandler.vsync;
         vsyncToggle.isOn = vsync;
@@ -231,11 +267,40 @@ public class MainMenuHandler : MonoBehaviour
         }
     }
     */
+    public void SwitchResolution()
+    {
+        int i = resolutionsDropdown.value;
+        Resolution[] resolutions = Screen.resolutions;
+        resWidth = resolutions[i].width;
+        resHeight = resolutions[i].height;
+        refreshRate = resolutions[i].refreshRate;
+        switch (profileHandler.windowedMode.ToLower())
+        {
+            default:
+                Debug.Log("Window mode not recognised.");
+                break;
+            case "borderless window":
+                Screen.SetResolution(resolutions[i].width, resolutions[i].height, FullScreenMode.FullScreenWindow, resolutions[i].refreshRate);
+                break;
+            case "exclusive fullscreen":
+                Screen.SetResolution(resolutions[i].width, resolutions[i].height, FullScreenMode.ExclusiveFullScreen, resolutions[i].refreshRate);
+                break;
+            case "windowed":
+                Screen.SetResolution(resolutions[i].width, resolutions[i].height, FullScreenMode.Windowed, resolutions[i].refreshRate);
+                break;
+        }
+    }
     public void SwitchMaxTextureSize()
     {
         maxTextureSize = Convert.ToInt32(maxTextureSizeSlider.value); // Convert the texture size slider to an integer
         QualitySettings.masterTextureLimit = maxTextureSize; // Set the texturelimit to maxTextureSize
         maxTextureSizeText.text = Convert.ToInt32(100 / (maxTextureSize + 1)).ToString() + "%"; // Calculate the percentage resolution of textures and set the text of maxTextureSizeText to that
+    }
+    public void SwitchRenderScale()
+    {
+        renderScale = renderScaleSlider.value;
+        renderPipelineAsset.renderScale = renderScale;
+        renderScaleText.text = Convert.ToInt32(renderScale * 100).ToString() + "%";
     }
     public void SwitchWindowMode()
     {
@@ -320,6 +385,10 @@ public class MainMenuHandler : MonoBehaviour
         //options.qualityLevel = QualitySettings.GetQualityLevel(); // Save every option to an Options object
         options.windowedMode = windowMode;
         options.vsync = vsync;
+        options.resWidth = resWidth;
+        options.resHeight = resHeight;
+        options.refreshRate = refreshRate;
+        options.renderScale = renderScale;
         options.volume = AudioListener.volume;
         options.linesPerFrame = Convert.ToInt32(linesPerFrameText.text);
         options.charactersPerSecond = float.Parse(charactersPerFrameText.text);

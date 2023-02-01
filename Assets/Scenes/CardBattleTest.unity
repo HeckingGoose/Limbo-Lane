@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.18028352, g: 0.22571376, b: 0.3069224, a: 1}
+  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -197,11 +197,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 75131760d0655bf429dec5f76c88506f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  health: 0
   enemyName: Dawn
+  fullDeck:
+    cards: []
   currency: 0
   ready: 0
   mainScript: {fileID: 1072616410}
-  healthBar: {fileID: 1321796262}
+  boardObject: {fileID: 1449541925}
 --- !u!1 &268290577
 GameObject:
   m_ObjectHideFlags: 0
@@ -524,8 +527,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c08b32d8a03c6bc40b821bc095b1a524, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  sceneStateLoader: {fileID: 0}
   cardBattleHUD: {fileID: 272550940}
   cardPrefab: {fileID: 8642576583363572454, guid: 9653e68efee458b44a25bdac97382577, type: 3}
+  boardPrefab: {fileID: 6586170444004513768, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
+  cardInfoPrefab: {fileID: 4642425625139935134, guid: d2d0e55af676b0347aac437484c96488, type: 3}
   enemy: {fileID: 173490911}
   board: {fileID: 1449541925}
   bellScript: {fileID: 389402389}
@@ -540,6 +546,11 @@ MonoBehaviour:
   - {fileID: 21300000, guid: d690d132221b4914ba075a040627e059, type: 3}
   - {fileID: 21300000, guid: a770237865adba845a87db6f5cc40852, type: 3}
   - {fileID: 21300000, guid: 0071971e9440a5c4d80bfba1bcae980e, type: 3}
+  defaultCardPortrait: {fileID: 21300000, guid: 423c47ac064c1a0499b41a5dc1ff6d4b, type: 3}
+  cardPortraits:
+  - {fileID: 21300000, guid: 41fb7ae2f330d2740b6baaaf9422991d, type: 3}
+  - {fileID: 21300000, guid: 3f8e090ef34732f4187470a8cfa4bdf5, type: 3}
+  playerCurrency: 0
 --- !u!4 &1072616411
 Transform:
   m_ObjectHideFlags: 0
@@ -554,17 +565,6 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 7
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1321796262 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 552171082633975088, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
-  m_PrefabInstance: {fileID: 552171082543299273}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1449541925 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6586170444004513768, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
@@ -700,6 +700,14 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 552171082336279245, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: m_FillAmount
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 552171082807949013, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 552171083166931281, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
       propertyPath: m_Pivot.x
       value: 0

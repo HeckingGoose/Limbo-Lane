@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 
 public class CardScript : MonoBehaviour
@@ -14,9 +15,12 @@ public class CardScript : MonoBehaviour
     private Vector3 direction;
     private float magnitude = 0.1f;
     private BoxCollider boxCollider;
+    public bool disabled = false;
     public Card cardData;
+    private CardScript cardScript;
     private void Start()
     {
+        cardScript = this.GetComponent<CardScript>();
         mainCamera = Camera.main.gameObject; // Find main camera in scene
         direction = mainCamera.transform.position - this.transform.position; // Calculate direction vector between camera and self
         direction = direction.normalized; // Normalize direction vector
@@ -30,7 +34,7 @@ public class CardScript : MonoBehaviour
     }
     private void OnMouseEnter()
     {
-        if (!selected) // If the card is not in its selected state
+        if (!selected && !disabled) // If the card is not in its selected state
         {
             this.transform.position = newPos; // Move the card to its mouse hover position
             this.transform.rotation = zeroRot; // Rotate the card to 0 rotation on all axis
@@ -39,7 +43,7 @@ public class CardScript : MonoBehaviour
     }
     private void OnMouseExit()
     {
-        if (!selected) // If the card is not in its selected state
+        if (!selected && !disabled) // If the card is not in its selected state
         {
             this.transform.position = ogPos; // Move the card to its original position
             this.transform.rotation = ogRot; // Rotate the card to its original rotation
@@ -48,16 +52,42 @@ public class CardScript : MonoBehaviour
     }
     public void Select() // Called when card is selected
     {
-        this.transform.position = newPos + transform.forward * -magnitude * 1/4; // Set the card's position to its mouse hover position + 1/4 of the required magnitude on the card's forward axis
-        this.transform.rotation = newRot; // Rotate the card to its new rotation
-        selected = true; // Set selected to true
-        boxCollider.enabled = false; // Disable the card's collider
+        if (!disabled)
+        {
+            this.transform.position = newPos + transform.forward * -magnitude * 1 / 4; // Set the card's position to its mouse hover position + 1/4 of the required magnitude on the card's forward axis
+            this.transform.rotation = newRot; // Rotate the card to its new rotation
+            selected = true; // Set selected to true
+            boxCollider.enabled = false; // Disable the card's collider
+        }
     }
     public void Unselect() // Called when another card is selected or screen is clicked elsewhere
     {
-        this.transform.position = ogPos; // Set the card's position to its original position
-        this.transform.rotation = ogRot; // Rotate the card to its original rotation
-        selected = false; // Set selected to false
-        boxCollider.enabled = true; // Enable the card's collider
+        if (!disabled)
+        {
+            this.transform.position = ogPos; // Set the card's position to its original position
+            this.transform.rotation = ogRot; // Rotate the card to its original rotation
+            selected = false; // Set selected to false
+            boxCollider.enabled = true; // Enable the card's collider
+        }
+    }
+    public void Disable() // Called when all other functions need to be ignored
+    {
+        disabled = true;
+    }
+    public void Enable() // Called when all other functions need to be re-enabled
+    {
+        disabled = false;
+    }
+    public void UpdateHealh()
+    {
+        this.transform.Find("Health").GetComponent<TextMeshPro>().text = cardScript.cardData.health.ToString();
+    }
+    public void UpdateCost()
+    {
+        this.transform.Find("Cost").GetComponent<TextMeshPro>().text = cardScript.cardData.cost.ToString();
+    }
+    public void UpdateAttack()
+    {
+        this.transform.Find("Attack").GetComponent<TextMeshPro>().text = cardScript.cardData.attack.ToString();
     }
 }

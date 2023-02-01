@@ -17,7 +17,7 @@ public class BellScript : MonoBehaviour
             bellClicked = false; // Set bellClicked to false
         }
     }
-    private void OnMouseOver() // Code in here is ran once when the mouse begins to hover over this object
+    private void OnMouseOver() // Code in here is ran while the mouse hovers over this object
     {
         if (!mouseDown && Input.GetAxis("PrimaryAction") > 0) // If the mouse is not held and the mouse is clicked
         {
