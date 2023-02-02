@@ -128,30 +128,25 @@ public class EnemyScript : MonoBehaviour
         switch (enemyName.ToLower()) // Pick which enemy AI needs to be used
         {
             default: // If enemyName matches none of the below cases
-                Debug.Log("Enemy name not recognised!"); // Inform the Unity console that something went wrong
-                return board; // Return board
-            case "dawn": // If the enemyName is dawn
                 deck = mainScript.PopulateDeck(fullDeck, handSize, deck);
+                GenerateDeck(); // Re-generate the deck
                 // v Create a new Card that is randomly picked from the enemy's deck v
                 bool richEnough = false;
-                foreach (Card card in deck.cards) // Loop through every card in deck
+                List<int> canAffordIndexes = new List<int>();
+                for (int i = 0; i < deck.cards.Length; i++) // Loop through every card in deck
                 {
-                    if (card.cost <= currency) // If the card's cost is less than the enemy's currency
+                    if (deck.cards[i].cost <= currency) // If the card's cost is less than the enemy's currency
                     {
                         richEnough = true; // Tell the game that the enemy is rich enough to place a card
+                        canAffordIndexes.Add(i);
                     }
                 }
                 int cardIndex = random.Next(0, cardObjects.Count); // Set CardIndex to a random card within the enemy's deck
                 if (richEnough) // If the enemy is rich-enough to place a card
                 {
-                    while (deck.cards[cardIndex].cost > currency) // Loop through the enemy's deck until a card that the enemy can afford is found
-                    {
-                        cardIndex = random.Next(0, cardObjects.Count); // Pick a random index in the enemy's deck
-                    }
-
-                    int boardy = random.Next(0, 2); // 0 is front, 1 is back, randomize a y co-ordinate for the card
-                    int boardx = random.Next(0, 4); // Randomize an x co-ordinate for the card
+                    cardIndex = canAffordIndexes[random.Next(0, canAffordIndexes.Count)]; // Pick a random index in the enemy's deck
                     int freeSpaces = 0; // Set freeSpaces to 0
+                    List<(int, int)> freeSpacesList = new List<(int, int)>();
                     for (int i = 0; i < 2; i++) // Loop through every row on the enemy's side of the board
                     {
                         for (int k = 0; k < 4; k++) // Loop through every column on the enemy's side of the board
@@ -159,18 +154,17 @@ public class EnemyScript : MonoBehaviour
                             if (board[i, k] == null) // If the space is empty
                             {
                                 freeSpaces++; // Add 1 to freeSpaces
+                                freeSpacesList.Add((i, k));
                             }
                         }
                     }
                     if (freeSpaces > 0) //If there are more than 0 free spaces
                     {
-                        while (board[boardy, boardx] != null) // Loop until the board position has no card on it
-                        {
-                            boardy = random.Next(0, 2); // 0 is front, 1 is back, randomize a y co-ordinate for the card
-                            boardx = random.Next(0, 4); // Randomize an x co-ordinate for the card
-                        }
-                        board[boardy, boardx] = cardObjects[cardIndex]; // Place the card on the board object
-                        PlaceCardOnBoard(cardObjects[cardIndex], boardx, boardy, board); // Place card on board
+                        (int, int) space = freeSpacesList[random.Next(0, freeSpacesList.Count)];
+                        int boardx = space.Item1;
+                        int boardy = space.Item2;
+                        board[boardx, boardy] = cardObjects[cardIndex]; // Place the card on the board object
+                        PlaceCardOnBoard(cardObjects[cardIndex], boardy, boardx, board); // Place card on board
                         currency -= cardObjects[cardIndex].GetComponent<CardScript>().cardData.cost; // Deduct cost of card from currency
                         mainScript.UpdateCurrency(mainScript.playerCurrency, currency); // Update the enemy and player's currency
                         cardObjects[cardIndex] = null; // need some way to track card to say is on board or not on board from perspective of fulldeck
@@ -205,7 +199,7 @@ public class EnemyScript : MonoBehaviour
                 {
                     deck = DrawPhisch(deck); // Draw a phisch
                 }
-                GenerateDeck(); // Re-generate the deck
+                //GenerateDeck(); // Re-generate the deck
                 return board; // Return the board
         }
     }

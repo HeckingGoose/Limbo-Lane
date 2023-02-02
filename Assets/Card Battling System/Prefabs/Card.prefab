@@ -791,8 +791,10 @@ MonoBehaviour:
     attack: 0
     state: 0
     ID: 0
+    ability: 0
     cost: 0
     maxCost: 0
+  nadaPrefab: {fileID: 3317782160009814206, guid: d5d7e6d0586fd864aab489a374783e90, type: 3}
 --- !u!65 &6825226928618423460
 BoxCollider:
   m_ObjectHideFlags: 0

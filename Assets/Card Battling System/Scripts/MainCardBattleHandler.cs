@@ -1,12 +1,8 @@
 using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using TMPro;
-using UnityEditor.PackageManager.UI;
 using UnityEngine;
-using UnityEngine.Experimental.AI;
 using UnityEngine.UI;
 
 public class MainCardBattleHandler : MonoBehaviour
@@ -30,7 +26,7 @@ public class MainCardBattleHandler : MonoBehaviour
     private BellScript bellScript;
     [SerializeField]
     private BellScript phischScript;
-    private GameObject[ , ] boardCards = new GameObject[4, 4];
+    private GameObject[,] boardCards;
     [SerializeField]
     private Material[] cardMaterials;
     [SerializeField]
@@ -72,13 +68,16 @@ public class MainCardBattleHandler : MonoBehaviour
     private bool showingPrompt = false;
     private GameObject createdPrompt = null;
     private Vector2 createdPromptSize;
+    private int column = 0;
+    private int waitingState = 0;
+    private CardScript attackCard;
+    private CardScript defendCard;
     #endregion
     private void Start()
     {
+        boardCards = new GameObject[4, 4];
         mainCamera = Camera.main.gameObject; // Find the main camera gameObject in the scene
         mainCameraCam = Camera.main; // Find the main camera in the scene
-        inCardBattle = true;
-        CardBattle();
     }
     private void Update()
     {
@@ -98,6 +97,12 @@ public class MainCardBattleHandler : MonoBehaviour
             mouseDown = true; // Set mouseDown to true
         }
         #endregion
+    }
+    public void StartCardBattle()
+    {
+        inCardBattle = true;
+        CardBattle();
+        
     }
     private void CardBattle()
     {
@@ -335,6 +340,7 @@ public class MainCardBattleHandler : MonoBehaviour
                     {
                         selecting = false; // Set selecting to false
                         selectedCard = null; // Set selectedCard to null
+                        selectedCardScript = null; // Set selectedCardScript to null
                         mouseDown = true; // Set mouseDown to true
                         if (playerCardObjects.Count != 0)
                         {
@@ -390,108 +396,154 @@ public class MainCardBattleHandler : MonoBehaviour
                     #endregion
                     break;
                 case "enemy": // If the current turn is enemy
-                    enemy.ComputeTurn(boardCards);// pass script onto enemy script for turn
+                    boardCards = enemy.ComputeTurn(boardCards);// pass script onto enemy script for turn
                     bellClicked = false; // Set bellClicked to false
                     currentTurn = "Player"; // Switch the turn to computeTurn
                     break;
                 case "computeturn":
-                    currentTurn = "Enemy"; // Set turn to enemy
-                    playerDeck = PopulateDeck(playerFullDeck, playerHandSize, playerDeck); // Populate the player deck <- figure out why this doesn't work
-                    int column = 0;
-                    GameObject playerFrontCard = null;
-                    GameObject playerBackCard = null; // Setup some variables for later use
-                    GameObject enemyFrontCard = null;
-                    GameObject enemyBackCard = null;
-                    int[] columnState = new int[4] { 0, 0, 0, 0 };
-                    for (int row = 0; row < boardCards.Length; row++) // Loop through every row
+                    switch (waitingState)
                     {
-                        if (row - (column * 4) == 4) // If row is a multiple of 4
-                        {
-                            CalculateAttack(column, columnState, new GameObject[4] { enemyBackCard, enemyFrontCard, playerFrontCard, playerBackCard }); // Call function to calculate the attack
-                            column++; // Add 1 to column
-                        }
-                        switch (row - (column * 4)) // Switch between row - column * 4
-                        {
-                            default: // If none of the below cases match
-                                Debug.Log("Board space (" + (row - (column * 4)) + "," + column + ") not recognised."); // Inform the Unity console that something went wrong
-                                break;
-                            case 0: // enemy back space
-                                if (boardCards[(row - (column * 4)), column] != null) // Check the space isn't empty
-                                {
-                                    enemyBackCard = boardCards[(row - (column * 4)), column];
-                                    //Debug.Log("Found enemy back card '" + enemyBackCard.name + ":" + enemyBackCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
-                                    columnState[0] = 1;
-                                }
-                                else // Otherwise
-                                {
-                                    enemyBackCard = null;
-                                    columnState[0] = 0; // Set card to null
-                                }
-                                break;
-                            case 1: // enemy front space
-                                if (boardCards[(row - (column * 4)), column] != null) // Check the space isn't empty
-                                {
-                                    enemyFrontCard = boardCards[(row - (column * 4)), column];
-                                    //Debug.Log("Found enemy front card '" + enemyFrontCard.name + ":" + enemyFrontCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
-                                    columnState[1] = 1;
-                                }
-                                else // Otherwise
-                                {
-                                    enemyFrontCard = null;
-                                    columnState[1] = 0; // Set card to null
-                                }
-                                break;
-                            case 2: // player front space
-                                if (boardCards[(row - (column * 4)), column] != null) // Check the space isn't empty
-                                {
-                                    playerFrontCard = boardCards[(row - (column * 4)), column];
-                                    //Debug.Log("Found player front card '" + playerFrontCard.name + ":" + playerFrontCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
-                                    columnState[2] = 1;
-                                }
-                                else // Otherwise
-                                {
-                                    playerFrontCard = null;
-                                    columnState[2] = 0; // Set card to null
-                                }
-                                break;
-                            case 3: // player back space
-                                if (boardCards[(row - (column * 4)), column] != null) // Check the space isn't empty
-                                {
-                                    playerBackCard = boardCards[(row - (column * 4)), column];
-                                    //Debug.Log("Found player back card '" + playerBackCard.name + ":" + playerBackCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
-                                    columnState[3] = 1;
-                                }
-                                else // Otherwise
-                                {
-                                    playerBackCard = null;
-                                    columnState[3] = 0; // Set card to null
-                                }
-                                break;
-                        }
-                    }
-                    CalculateAttack(column, columnState, new GameObject[4] { enemyBackCard, enemyFrontCard, playerFrontCard, playerBackCard }); // Calculate attack again
-                    foreach (GameObject card in boardCards)
-                    {
-                        if (card != null)
-                        {
-                            CardScript cardScript = card.GetComponent<CardScript>();
-                            if (cardScript.cardData.name.ToLower() == "phisch")
+                        default:
+                            Debug.Log("Waiting state not recognised! Defaulting to 0.");
+                            waitingState = 0;
+                            break;
+                        case 0:
+                            if (column >= 4)
                             {
-                                cardScript.cardData.cost++;
-                                cardScript.cardData.maxCost = cardScript.cardData.cost; // This doesn't need any health calculations as fish max hp is 1
-                                cardScript.UpdateCost();
+                                currentTurn = "Enemy"; // Set turn to enemy
+                                column = 0;
                             }
-                        }
-                    }
-                    GenerateDeck(); // Re-generate the deck
-                    // this is where the card battle ends
-                    if (enemy.health <= 0) // If the enemy runs out of health
-                    { // Player wins
-                        currentTurn = "PlayerWin"; // Switch turn to playerWin
-                    }
-                    else if (health <= 0) // If the player health runs out of health
-                    { // Enemy wins
-                        currentTurn = "EnemyWin"; // Switch turn to enemyTurn
+                            playerDeck = PopulateDeck(playerFullDeck, playerHandSize, playerDeck); // Populate the player deck <- figure out why this doesn't work
+                            GameObject playerFrontCard = null;
+                            GameObject playerBackCard = null; // Setup some variables for later use
+                            GameObject enemyFrontCard = null;
+                            GameObject enemyBackCard = null;
+                            int[] columnState = new int[4] { 0, 0, 0, 0 };
+                            for (int row = 0; row < 4; row++) // Loop through every row
+                            {
+                                switch (row) // Switch between row - column * 4
+                                {
+                                    default: // If none of the below cases match
+                                        Debug.Log("Board space (" + row + "," + column + ") not recognised."); // Inform the Unity console that something went wrong
+                                        break;
+                                    case 0: // enemy back space
+                                        if (boardCards[row, column] != null) // Check the space isn't empty
+                                        {
+                                            enemyBackCard = boardCards[row, column];
+                                            //Debug.Log("Found enemy back card '" + enemyBackCard.name + ":" + enemyBackCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
+                                            columnState[0] = 1;
+                                        }
+                                        else // Otherwise
+                                        {
+                                            enemyBackCard = null;
+                                            columnState[0] = 0; // Set card to null
+                                        }
+                                        break;
+                                    case 1: // enemy front space
+                                        if (boardCards[row, column] != null) // Check the space isn't empty
+                                        {
+                                            enemyFrontCard = boardCards[row, column];
+                                            //Debug.Log("Found enemy front card '" + enemyFrontCard.name + ":" + enemyFrontCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
+                                            columnState[1] = 1;
+                                        }
+                                        else // Otherwise
+                                        {
+                                            enemyFrontCard = null;
+                                            columnState[1] = 0; // Set card to null
+                                        }
+                                        break;
+                                    case 2: // player front space
+                                        if (boardCards[row, column] != null) // Check the space isn't empty
+                                        {
+                                            playerFrontCard = boardCards[row, column];
+                                            //Debug.Log("Found player front card '" + playerFrontCard.name + ":" + playerFrontCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
+                                            columnState[2] = 1;
+                                        }
+                                        else // Otherwise
+                                        {
+                                            playerFrontCard = null;
+                                            columnState[2] = 0; // Set card to null
+                                        }
+                                        break;
+                                    case 3: // player back space
+                                        if (boardCards[row, column] != null) // Check the space isn't empty
+                                        {
+                                            playerBackCard = boardCards[row, column];
+                                            //Debug.Log("Found player back card '" + playerBackCard.name + ":" + playerBackCard.ID + "' on space (" + (row - (column * 4)) + "," + column + ").");
+                                            columnState[3] = 1;
+                                        }
+                                        else // Otherwise
+                                        {
+                                            playerBackCard = null;
+                                            columnState[3] = 0; // Set card to null
+                                        }
+                                        break;
+                                }
+                            }
+                            for (int i = 0; i < 4; i++)
+                            {
+                                if (boardCards[i, column] != null)
+                                {
+                                    CardScript cardScript = boardCards[i, column].GetComponent<CardScript>();
+                                    if (cardScript.cardData.name.ToLower() == "phisch")
+                                    {
+                                        cardScript.cardData.cost++;
+                                        cardScript.cardData.maxCost = cardScript.cardData.cost; // This doesn't need any health calculations as fish max hp is 1
+                                        cardScript.UpdateCost();
+                                    }
+                                }
+                            }
+                            (attackCard, defendCard) = CalculateAttack(column, columnState, new GameObject[4] { enemyBackCard, enemyFrontCard, playerFrontCard, playerBackCard }); // Calculate attack again
+                            column++;
+                            GenerateDeck(); // Re-generate the deck
+                            waitingState = 1;
+                            break;
+                        case 1: // Do card attacking
+                            if (attackCard == null)
+                            {
+                                waitingState = 2;
+                            }
+                            else
+                            {
+                                if (attackCard.cardData.attack > 0)
+                                {
+                                    waitingState += attackCard.DoAttack();
+                                }
+                                else
+                                {
+                                    waitingState = 2;
+                                }
+                            }
+                            break;
+                        case 2: // Do card defending
+                            if (defendCard == null)
+                            {
+                                waitingState = 3;
+                            }
+                            else
+                            {
+                                if (defendCard.cardData.attack > 0)
+                                {
+                                    waitingState += defendCard.DoAttack();
+                                }
+                                else
+                                {
+                                    waitingState = 3;
+                                }
+                            }
+                            break;
+                        case 3: // Animating is done
+                            // this is where the card battle ends
+                            if (enemy.health <= 0) // If the enemy runs out of health
+                            { // Player wins
+                                currentTurn = "PlayerWin"; // Switch turn to playerWin
+                            }
+                            else if (health <= 0) // If the player health runs out of health
+                            { // Enemy wins
+                                currentTurn = "EnemyWin"; // Switch turn to enemyTurn
+                            }
+                            waitingState = 0;
+                            break;
                     }
                     break;
                 case "playerwin":
@@ -708,7 +760,7 @@ public class MainCardBattleHandler : MonoBehaviour
                 {
                     damageDealt = damageDealt * 2;
                     crit = true;
-                    Debug.Log("Did crit");
+                    //Debug.Log("Did crit");
                 }
                 break;
         }
@@ -722,13 +774,13 @@ public class MainCardBattleHandler : MonoBehaviour
                 {
                     defendingCard.health += damageDealt;
                     attackingCard.health -= damageDealt;
-                    Debug.Log("Reflected damage");
+                    //Debug.Log("Reflected damage");
                 }
                 break;
             case 3: // immune to crits
                 if (crit)
                 {
-                    Debug.Log("Blocked crit");
+                    //Debug.Log("Blocked crit");
                     damageDealt = damageDealt / 2;
                 }
                 break;
@@ -736,19 +788,21 @@ public class MainCardBattleHandler : MonoBehaviour
         defendingCard.health -= damageDealt;
         return (attackingCard, defendingCard);
     }
-    private void CalculateAttack(int column, int[] columnState, GameObject[] columnCardsObj)
+    private (CardScript, CardScript) CalculateAttack(int column, int[] columnState, GameObject[] columnCardsObj)
     {
         string state = "";
+        CardScript attackingCard = null;
+        CardScript defendingCard = null;
         foreach (int i in columnState)
         {
             state += i.ToString();
         }
-        Card[] columnCards = new Card[columnCardsObj.Length];
+        CardScript[] columnCards = new CardScript[columnCardsObj.Length];
         for (int i = 0; i < columnCards.Length; i++)
         {
             if (columnCardsObj[i] != null)
             {
-                columnCards[i] = columnCardsObj[i].GetComponent<CardScript>().cardData;
+                columnCards[i] = columnCardsObj[i].GetComponent<CardScript>();
             }
             else
             {
@@ -758,101 +812,131 @@ public class MainCardBattleHandler : MonoBehaviour
         switch (state)
         {
             default:
-                Debug.Log("No cards on board at column " + column + " so nothing happened. (" + state + ")");
+                //Debug.Log("No cards on board at column " + column + " so nothing happened. (" + state + ")");
                 break;
             case "0001": // player has back card
-                Debug.Log("Player back card cannot reach enemy player on column " + column + " so nothing happened. (" + state + ")");
+                //Debug.Log("Player back card cannot reach enemy player on column " + column + " so nothing happened. (" + state + ")");
+                if (columnCards[3].cardData.attack > 0)
+                {
+                    columnCards[3].ShowNada();
+                }
                 break;
             case "0010": // player has front card
-                Debug.Log("Player front card can reach enemy player on column " + column + " so enemy player takes damage. (" + state + ")");
-                enemy.health -= columnCards[2].attack;
+                //Debug.Log("Player front card can reach enemy player on column " + column + " so enemy player takes damage. (" + state + ")");
+                enemy.health -= columnCards[2].cardData.attack;
+                attackingCard = columnCards[2];
                 break;
             case "0100": // enemy has front card
-                Debug.Log("Enemy front card can reach player player on column " + column + " so player player takes damage. (" + state + ")");
-                health -= columnCards[1].attack;
+                //Debug.Log("Enemy front card can reach player player on column " + column + " so player player takes damage. (" + state + ")");
+                health -= columnCards[1].cardData.attack;
+                attackingCard = columnCards[1];
                 break;
             case "1000": // enemy has back card
-                Debug.Log("Enemy back card cannot reach player player on column " + column + " so nothing happened. (" + state + ")");
+                //Debug.Log("Enemy back card cannot reach player player on column " + column + " so nothing happened. (" + state + ")");
+                if (columnCards[0].cardData.attack > 0)
+                {
+                    columnCards[0].ShowNada();
+                }
                 break;
             case "0011": // player has front and back card
-                Debug.Log("Player front card can reach enemy player and player back card is blocked by front card on column " + column + " so the enemy player takes damage. (" + state + ")");
-                enemy.health -= columnCards[2].attack;
+                //Debug.Log("Player front card can reach enemy player and player back card is blocked by front card on column " + column + " so the enemy player takes damage. (" + state + ")");
+                enemy.health -= columnCards[2].cardData.attack;
+                attackingCard = columnCards[2];
                 break;
             case "0101": // player has back card and enemy has front card
-                Debug.Log("Player has back card that can reach enemy front card on column " + column + " so player back card and enemy front card hit each other (" + state + ")");
-                (columnCards[3], columnCards[1]) = DoAttack(columnCards[3], columnCards[1]);
-                if (columnCards[1].health > 0)
+                //Debug.Log("Player has back card that can reach enemy front card on column " + column + " so player back card and enemy front card hit each other (" + state + ")");
+                (columnCards[3].cardData, columnCards[1].cardData) = DoAttack(columnCards[3].cardData, columnCards[1].cardData);
+                if (columnCards[1].cardData.health > 0)
                 {
-                    (columnCards[1], columnCards[3]) = DoAttack(columnCards[1], columnCards[3]);
+                    (columnCards[1].cardData, columnCards[3].cardData) = DoAttack(columnCards[1].cardData, columnCards[3].cardData);
+                    defendingCard = columnCards[1];
                 }
+                attackingCard = columnCards[3];
                 break;
             case "1001": // player has back card and enemy has back card
-                Debug.Log("Player has back card that can reach enemy back card on column " + column + " so player back card and enemy back card hit each other. (" + state + ")");
-                (columnCards[3], columnCards[0]) = DoAttack(columnCards[3], columnCards[0]);
-                if (columnCards[0].health > 0)
+                //Debug.Log("Player has back card that can reach enemy back card on column " + column + " so player back card and enemy back card hit each other. (" + state + ")");
+                (columnCards[3].cardData, columnCards[0].cardData) = DoAttack(columnCards[3].cardData, columnCards[0].cardData);
+                if (columnCards[0].cardData.health > 0)
                 {
-                    (columnCards[0], columnCards[3]) = DoAttack(columnCards[0], columnCards[3]);
+                    (columnCards[0].cardData, columnCards[3].cardData) = DoAttack(columnCards[0].cardData, columnCards[3].cardData);
+                    defendingCard = columnCards[0];
                 }
+                attackingCard = columnCards[3];
                 break;
             case "0110": // player has front card and enemy has front card
-                Debug.Log("Player has front card that can reach enemy front card on column " + column + " so the player front card and enemy front card hit each other. (" + state + ")");
-                (columnCards[2], columnCards[1]) = DoAttack(columnCards[2], columnCards[1]);
-                if (columnCards[1].health > 0)
+                //Debug.Log("Player has front card that can reach enemy front card on column " + column + " so the player front card and enemy front card hit each other. (" + state + ")");
+                (columnCards[2].cardData, columnCards[1].cardData) = DoAttack(columnCards[2].cardData, columnCards[1].cardData);
+                if (columnCards[1].cardData.health > 0)
                 {
-                    (columnCards[1], columnCards[2]) = DoAttack(columnCards[1], columnCards[2]);
+                    (columnCards[1].cardData, columnCards[2].cardData) = DoAttack(columnCards[1].cardData, columnCards[2].cardData);
+                    defendingCard = columnCards[1];
                 }
+                attackingCard = columnCards[2];
                 break;
             case "1010": // player has front card and enemy has back card
-                Debug.Log("Player has front card that can reach enemy back card on column " + column + " so the player front card and enemy back card hit each other. (" + state + ")");
-                (columnCards[2], columnCards[0]) = DoAttack(columnCards[2], columnCards[0]);
-                if (columnCards[0].health > 0)
+                //Debug.Log("Player has front card that can reach enemy back card on column " + column + " so the player front card and enemy back card hit each other. (" + state + ")");
+                (columnCards[2].cardData, columnCards[0].cardData) = DoAttack(columnCards[2].cardData, columnCards[0].cardData);
+                if (columnCards[0].cardData.health > 0)
                 {
-                    (columnCards[0], columnCards[2]) = DoAttack(columnCards[0], columnCards[2]);
+                    (columnCards[0].cardData, columnCards[2].cardData) = DoAttack(columnCards[0].cardData, columnCards[2].cardData);
+                    defendingCard = columnCards[0];
                 }
+                attackingCard = columnCards[2];
                 break;
             case "1100": // enemy has front and back card
-                Debug.Log("Enemy has front card that can reach player and enemy has back card blocked by front card on column " + column + " so the enemy front card damages the player. (" + state + ")");
-                health -= columnCards[1].attack;
+                //Debug.Log("Enemy has front card that can reach player and enemy has back card blocked by front card on column " + column + " so the enemy front card damages the player. (" + state + ")");
+                health -= columnCards[1].cardData.attack;
+                attackingCard = columnCards[1];
                 break;
             case "0111": // player has front and back card and enemy has front card
-                Debug.Log("Player has front card that can reach enemy front card and player has back card that is blocked by front card on column " + column + " so the player front card and enemy front card damage each other. (" + state + ")");
-                (columnCards[2], columnCards[1]) = DoAttack(columnCards[2], columnCards[1]);
-                if (columnCards[1].health > 0)
+                //Debug.Log("Player has front card that can reach enemy front card and player has back card that is blocked by front card on column " + column + " so the player front card and enemy front card damage each other. (" + state + ")");
+                (columnCards[2].cardData, columnCards[1].cardData) = DoAttack(columnCards[2].cardData, columnCards[1].cardData);
+                if (columnCards[1].cardData.health > 0)
                 {
-                    (columnCards[1], columnCards[2]) = DoAttack(columnCards[1], columnCards[2]);
+                    (columnCards[1].cardData, columnCards[2].cardData) = DoAttack(columnCards[1].cardData, columnCards[2].cardData);
+                    defendingCard = columnCards[1];
                 }
+                attackingCard = columnCards[2];
                 break;
             case "1011": // player has front and back card and enemy has back card
-                Debug.Log("Player has front card that can reach enemy back card and player has back card that is blocked by front card on column " + column + " so the player front card and enemy back card hit each other. (" + state + ")");
-                (columnCards[2], columnCards[0]) = DoAttack(columnCards[2], columnCards[0]);
-                if (columnCards[0].health > 0)
+                //Debug.Log("Player has front card that can reach enemy back card and player has back card that is blocked by front card on column " + column + " so the player front card and enemy back card hit each other. (" + state + ")");
+                (columnCards[2].cardData, columnCards[0].cardData) = DoAttack(columnCards[2].cardData, columnCards[0].cardData);
+                if (columnCards[0].cardData.health > 0)
                 {
-                    (columnCards[0], columnCards[2]) = DoAttack(columnCards[0], columnCards[2]);
+                    (columnCards[0].cardData, columnCards[2].cardData) = DoAttack(columnCards[0].cardData, columnCards[2].cardData);
+                    defendingCard = columnCards[0];
                 }
+                attackingCard = columnCards[2];
                 break;
             case "1101": // enemy has front and back card and player has back card
-                Debug.Log("Player has back card that can reach enemy front card and enemy back card is blocked by front card on column " + column + " so the player back card and enemy front card hit each other. (" + state + ")");
-                (columnCards[3], columnCards[1]) = DoAttack(columnCards[3], columnCards[1]);
-                if (columnCards[1].health > 0)
+                //Debug.Log("Player has back card that can reach enemy front card and enemy back card is blocked by front card on column " + column + " so the player back card and enemy front card hit each other. (" + state + ")");
+                (columnCards[3].cardData, columnCards[1].cardData) = DoAttack(columnCards[3].cardData, columnCards[1].cardData);
+                if (columnCards[1].cardData.health > 0)
                 {
-                    (columnCards[1], columnCards[3]) = DoAttack(columnCards[1], columnCards[3]);
+                    (columnCards[1].cardData, columnCards[3].cardData) = DoAttack(columnCards[1].cardData, columnCards[3].cardData);
+                    defendingCard = columnCards[1];
                 }
+                attackingCard = columnCards[3];
                 break;
             case "1110": // enemy has front and back card and player has front card
-                Debug.Log("Player has front card that can reach enemy front card and enemy has back card blocked by front card on column " + column + " so the enemy front card and player front card hit each other. (" + state + ")");
-                (columnCards[2], columnCards[1]) = DoAttack(columnCards[2], columnCards[1]);
-                if (columnCards[1].health > 0)
+                //Debug.Log("Player has front card that can reach enemy front card and enemy has back card blocked by front card on column " + column + " so the enemy front card and player front card hit each other. (" + state + ")");
+                (columnCards[2].cardData, columnCards[1].cardData) = DoAttack(columnCards[2].cardData, columnCards[1].cardData);
+                if (columnCards[1].cardData.health > 0)
                 {
-                    (columnCards[1], columnCards[2]) = DoAttack(columnCards[1], columnCards[2]);
+                    (columnCards[1].cardData, columnCards[2].cardData) = DoAttack(columnCards[1].cardData, columnCards[2].cardData);
+                    defendingCard = columnCards[1];
                 }
+                attackingCard = columnCards[2];
                 break;
             case "1111": // enemy has front and back card and player has front and back card
-                Debug.Log("Player has front card that can reach enemy front card and enemy has back card blocked by front card and player has back card blocked by front card on column " + column + " so the enemy front card and player front card hit each other. (" + state + ")");
-                (columnCards[2], columnCards[1]) = DoAttack(columnCards[2], columnCards[1]);
-                if (columnCards[1].health > 0)
+                //Debug.Log("Player has front card that can reach enemy front card and enemy has back card blocked by front card and player has back card blocked by front card on column " + column + " so the enemy front card and player front card hit each other. (" + state + ")");
+                (columnCards[2].cardData, columnCards[1].cardData) = DoAttack(columnCards[2].cardData, columnCards[1].cardData);
+                if (columnCards[1].cardData.health > 0)
                 {
-                    (columnCards[1], columnCards[2]) = DoAttack(columnCards[1], columnCards[2]);
+                    (columnCards[1].cardData, columnCards[2].cardData) = DoAttack(columnCards[1].cardData, columnCards[2].cardData);
+                    defendingCard = columnCards[1];
                 }
+                attackingCard = columnCards[2];
                 break;
                 
         }
@@ -860,13 +944,13 @@ public class MainCardBattleHandler : MonoBehaviour
         {
             if (columnCardsObj[j] != null)
             {
-                columnCardsObj[j].transform.Find("Health").GetComponent<TextMeshPro>().text = columnCards[j].health.ToString();
-                float maxCost = columnCards[j].maxCost;
-                float maxHealth = columnCards[j].maxHealth;
-                float health = columnCards[j].health;
-                columnCards[j].cost = Convert.ToInt32((maxCost * (health / maxHealth)));
-                columnCardsObj[j].transform.Find("Cost").GetComponent<TextMeshPro>().text = columnCards[j].cost.ToString();
-                if (columnCards[j].health <= 0)
+                columnCardsObj[j].transform.Find("Health").GetComponent<TextMeshPro>().text = columnCards[j].cardData.health.ToString();
+                float maxCost = columnCards[j].cardData.maxCost;
+                float maxHealth = columnCards[j].cardData.maxHealth;
+                float health = columnCards[j].cardData.health;
+                columnCards[j].cardData.cost = Convert.ToInt32((maxCost * (health / maxHealth)));
+                columnCardsObj[j].transform.Find("Cost").GetComponent<TextMeshPro>().text = columnCards[j].cardData.cost.ToString();
+                if (columnCards[j].cardData.health <= 0)
                 {
                     GameObject.Destroy(columnCardsObj[j]);
                     columnCardsObj[j] = null;
@@ -874,7 +958,7 @@ public class MainCardBattleHandler : MonoBehaviour
                     {
                         foreach (Card card in enemy.fullDeck.cards)
                         {
-                            if (columnCards[j].ID == card.ID)
+                            if (columnCards[j].cardData.ID == card.ID)
                             {
                                 card.state = 0;
                             }
@@ -884,7 +968,7 @@ public class MainCardBattleHandler : MonoBehaviour
                     {
                         foreach (Card card in playerFullDeck.cards)
                         {
-                            if (columnCards[j].ID == card.ID)
+                            if (columnCards[j].cardData.ID == card.ID)
                             {
                                 card.state = 0;
                             }
@@ -894,6 +978,7 @@ public class MainCardBattleHandler : MonoBehaviour
             }
         }
         UpdateHealth();
+        return (attackingCard, defendingCard);
     }
     private void GenerateDeck()
     {

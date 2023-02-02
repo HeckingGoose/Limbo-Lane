@@ -141,7 +141,6 @@
         "WaitForInput",
         "ModifyTextBox; CharacterSpeechTextBox; text = ",
         "AddSmoothText; 'For every turn that a phisch card is on the board, it`s value increases by one chip.'; CharacterSpeechTextBox; clickToSkip = true",
-        "LoadScene; CardBattleTest",
         "EndConversation"
       ]
     },

@@ -263,7 +263,7 @@ public class Oyster : MonoBehaviour
                 }
                 else
                 {
-                    Debug.Log("Unable to load skip speed, defaulting to 0.5");
+                    Debug.Log("Unable to load skip speed, defaulting to 0.1");
                     skipSpeed = 0.1f;
                 }
                 if (PersistentVariables.charactersPerSecond != 0)
@@ -272,7 +272,8 @@ public class Oyster : MonoBehaviour
                 }
                 else
                 {
-                    Debug.Log("Characters per second not set, defaulting to 2!");
+                    Debug.Log("Characters per second not set, defaulting to 10!");
+                    charactersPerSecond = 10;
                 }
                 if (PersistentVariables.linesPerFrame != -1)
                 {
@@ -280,8 +281,8 @@ public class Oyster : MonoBehaviour
                 }
                 else
                 {
-                    Debug.Log("Lines per frame could not be loaded, defaulting to 5!");
-                    maxLinesPerFrame = 5;
+                    Debug.Log("Lines per frame could not be loaded, defaulting to 20!");
+                    maxLinesPerFrame = 20;
                 }
                 inConversation = true; // Set inConversation to true so that on next entry the method knows a conversation is underway
                 AsyncOperationHandle<TextAsset> conversationDataHandle = Addressables.LoadAssetAsync<TextAsset>("Assets/Oyster/JSON/Conversations-" + language + "/Character" + _characterIndex.ToString() + "-Conversations.json"); // Begin loading the required conversation, with multiple language support. Nifty

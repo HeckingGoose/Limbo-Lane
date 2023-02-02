@@ -508,6 +508,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1072616411}
   - component: {fileID: 1072616410}
+  - component: {fileID: 1072616412}
   m_Layer: 0
   m_Name: GlobalEventHandler
   m_TagString: Untagged
@@ -565,6 +566,19 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 7
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1072616412
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1072616409}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0259ab4d9486514da888890dd4c7532, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mainCardBattleHandler: {fileID: 1072616410}
 --- !u!1 &1449541925 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6586170444004513768, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}

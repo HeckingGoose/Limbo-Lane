@@ -9,6 +9,8 @@ public class SceneStateLoader : MonoBehaviour
     private OysterInitialiseScript oysterCaller;
     [SerializeField] // Define variables
     private OysterCharacterScript oysterCharacter;
+    [SerializeField]
+    private MainCardBattleHandler mainCardBattleHandler;
     private int locationState = 71077345;
     public bool done = false;
     private void Start()
@@ -64,9 +66,9 @@ public class SceneStateLoader : MonoBehaviour
                     case 1: // If the locationState is 1
                         oysterCharacter.SetConversationName("AlyxPostTutorialIntro"); // Set and run the conversation 'AlyxPostTutorialIntro'
                         oysterCaller.CallScript(oysterCharacter);
-                        
-                        // Begin a card battle here
 
+                        // Begin a card battle here
+                        mainCardBattleHandler.StartCardBattle();
                         break;
                 }
                 break;
