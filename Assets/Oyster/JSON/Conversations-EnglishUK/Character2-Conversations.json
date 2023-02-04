@@ -111,8 +111,8 @@
         "DelObject; ConversationBackground",
         "DelObject; CharacterNameTextBox",
         "DelObject; CharacterSpeechTextBox",
-        "ManipulateObject; 'Main Camera'; moveTo = (0, 1.171, 1.22); rotateTo = (63.527, 180, 0); interpolation = linear; time = 2; manipulatePermanent = true",
-        "ModCamFOV; 'Main Camera'; 80; time = 0.5; clickToSkip = true; permanent = true",
+        "ManipulateObject; 'Main Camera'; moveTo = (0, 1.44, 1.29); rotateTo = (63.527, 180, 0); interpolation = linear; time = 2; manipulatePermanent = true",
+        "ModCamFOV; 'Main Camera'; 60; time = 0.5; clickToSkip = true; permanent = true",
         "AddTextBox; CharacterSpeechTextBox; (0, 470); (1500,100); fontSize = 60; font = Drawn-Default; colourFromCharacter = Dreamweaver; alignment = centre",
         "AddSmoothText; 'This is the `board`.'; CharacterSpeechTextBox; clickToSkip = true",
         "WaitForInput",
@@ -141,6 +141,7 @@
         "WaitForInput",
         "ModifyTextBox; CharacterSpeechTextBox; text = ",
         "AddSmoothText; 'For every turn that a phisch card is on the board, it`s value increases by one chip.'; CharacterSpeechTextBox; clickToSkip = true",
+        "ManipulateObject; 'Main Camera'; moveTo = (0, 1.44, 1.58); rotateTo = (63.527, 180, 0); interpolation = linear; time = 2; manipulatePermanent = true",
         "EndConversation"
       ]
     },
@@ -148,8 +149,8 @@
       "title": "AlyxPostTutorialIntro",
       "scriptVersion": "3.0.0",
       "commands": [
-        "ManipulateObject; 'Main Camera'; moveTo = (0, 1.171, 1.193); rotateTo = (63.527, 180, 0); interpolation = linear; time = 2; manipulatePermanent = true",
-        "ModCamFOV; 'Main Camera'; 80; interpolation = none; clickToSkip = true; permanent = true",
+        "ManipulateObject; 'Main Camera'; moveTo = (0, 1.44, 1.58); rotateTo = (63.527, 180, 0); interpolation = linear; time = 2; manipulatePermanent = true",
+        "ModCamFOV; 'Main Camera'; 60; interpolation = none; clickToSkip = true; permanent = true",
         "ManipulateImage; Cover; alpha = 0; time = 1",
         "EndConversation; bumpSceneState = false"
       ]

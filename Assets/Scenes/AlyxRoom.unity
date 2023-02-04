@@ -188,7 +188,8 @@ MonoBehaviour:
   locationName: AlyxRoom
   oysterCaller: {fileID: 509566713}
   oysterCharacter: {fileID: 431300286}
-  mainCardBattleHandler: {fileID: 0}
+  mainCardBattleHandler: {fileID: 120636144}
+  locationState: 71077345
   done: 0
 --- !u!114 &120636144
 MonoBehaviour:

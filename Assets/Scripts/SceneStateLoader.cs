@@ -11,13 +11,11 @@ public class SceneStateLoader : MonoBehaviour
     private OysterCharacterScript oysterCharacter;
     [SerializeField]
     private MainCardBattleHandler mainCardBattleHandler;
-    private int locationState = 71077345;
+    [HideInInspector]
+    public int locationState = 71077345;
+    [HideInInspector]
     public bool done = false;
     private void Start()
-    {
-        Run(); // Call public run method on scene start
-    }
-    public void Run() // Method is public so that Oyster can call it on conversation end
     {
         if (PersistentVariables.documentsPath == "") // If documents path has not been defined
         {
@@ -46,6 +44,11 @@ public class SceneStateLoader : MonoBehaviour
             Debug.Log("Profile data could not be found!"); // Inform the Unity console that something went wrong
             locationState = 0; // Set locationState to 0
         }
+        Run(); // Call public run method on scene start
+    }
+    public void Run() // Method is public so that Oyster can call it on conversation end
+    {
+        Debug.Log(locationName + ": " + locationState);
         switch (locationName) // Compare locationName against below cases
         {
             default: // If locationName matches no cases
@@ -64,11 +67,11 @@ public class SceneStateLoader : MonoBehaviour
                         oysterCaller.CallScript(oysterCharacter);
                         break;
                     case 1: // If the locationState is 1
-                        oysterCharacter.SetConversationName("AlyxPostTutorialIntro"); // Set and run the conversation 'AlyxPostTutorialIntro'
-                        oysterCaller.CallScript(oysterCharacter);
-
-                        // Begin a card battle here
+                        //oysterCharacter.SetConversationName("AlyxPostTutorialIntro"); // Set and run the conversation 'AlyxPostTutorialIntro'
+                        //oysterCaller.CallScript(oysterCharacter);
                         mainCardBattleHandler.StartCardBattle();
+                        // Begin a card battle here
+                        //mainCardBattleHandler.StartCardBattle();
                         break;
                 }
                 break;

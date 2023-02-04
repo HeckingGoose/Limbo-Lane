@@ -266,7 +266,7 @@ public class Oyster : MonoBehaviour
                     Debug.Log("Unable to load skip speed, defaulting to 0.1");
                     skipSpeed = 0.1f;
                 }
-                if (PersistentVariables.charactersPerSecond != 0)
+                if (PersistentVariables.charactersPerSecond >= 0)
                 {
                     charactersPerSecond = PersistentVariables.charactersPerSecond;
                 }
@@ -1997,13 +1997,14 @@ public class Oyster : MonoBehaviour
                     }
                 }
                 File.WriteAllText(PersistentVariables.documentsPath + @"\My Games\LimboLane\Profiles\" + PersistentVariables.profileName + ".json", JsonUtility.ToJson(profileData));
-                sceneStateLoader.Run();
             }
             catch
             {
                 Debug.Log("Unable to update profile with new location!");
             }
         }
+        sceneStateLoader.locationState++;
+        sceneStateLoader.Run();
         currentLine++;
         inConversation = false; // Tell the script that it is no longer in a conversation
         CleanupSpeech(); // Calls the cleanup method to unload any currently loaded addressables and remove any objects created by the script

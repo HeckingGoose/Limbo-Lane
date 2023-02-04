@@ -21,21 +21,43 @@ public class CardScript : MonoBehaviour
 
     private int attackState = 0;
     private float animTimer = 0;
-    private Vector3 animOgPos;
+    private Vector3 animOgPos; // Variables for handling the attack animation
     private Vector3 animLastPos;
 
     private float nadaTimer = 0;
     private bool showingNada = false;
     [SerializeField]
-    private GameObject nadaPrefab;
+    private GameObject nadaPrefab; // Variables for handling the NADA particle
     private GameObject nada = null;
+    private bool showing = false;
+
+    private GameObject slapSprite; // Variables for handlign the slap sprite
 
     private void Update()
     {
-        if (showingNada)
+        if (showingNada) // If the NADA object needs to be handled
         {
-            ShowNada();
+            ShowNada(); // Run the method to handle NADA
         }
+        switch (showing) // Choose whether slap sprite is to be shown or not showing
+        {
+            case true: // show slap sprite
+                if (slapSprite.activeSelf != true) // If the sprite is not active
+                {
+                    slapSprite.SetActive(true); // Set it to active
+                }
+                break;
+            case false: // hide slap sprite
+                if (slapSprite.activeSelf != false) // If the sprite is not inactive
+                {
+                    slapSprite.SetActive(false); // Set the sprite to be inactive
+                }
+                break;
+        }
+    }
+    private void LateUpdate() // Runs after main update
+    {
+        showing = false; // Reset showing to false for next frame
     }
 
     private void Start()
@@ -48,9 +70,10 @@ public class CardScript : MonoBehaviour
         ogPos = this.transform.position;
         newPos = ogPos + direction; // Define other vectors for places the card can move to
         ogRot = this.transform.rotation;
-        newRot = Quaternion.Euler(new Vector3(0, -90f, 0));
+        newRot = Quaternion.Euler(new Vector3(0, 0, 0));
         zeroRot = new Quaternion();
         boxCollider = this.GetComponent<BoxCollider>(); // Store reference to box collider
+        slapSprite = this.transform.Find("SlapSprite").gameObject;
     }
     private void OnMouseEnter()
     {
@@ -98,98 +121,100 @@ public class CardScript : MonoBehaviour
     {
         disabled = false;
     }
-    public void UpdateHealh()
+    public void UpdateHealh() // Updates card health text
     {
-        this.transform.Find("Health").GetComponent<TextMeshPro>().text = cardScript.cardData.health.ToString();
+        this.transform.Find("Health").GetComponent<TextMeshPro>().text = cardScript.cardData.health.ToString(); // Find health text object and set it equal to the card's health as a string
     }
-    public void UpdateCost()
+    public void UpdateCost() // Updates card cost text
     {
-        this.transform.Find("Cost").GetComponent<TextMeshPro>().text = cardScript.cardData.cost.ToString();
+        this.transform.Find("Cost").GetComponent<TextMeshPro>().text = cardScript.cardData.cost.ToString(); // Find the cost text object and set it equal to the card's cost as a string
     }
-    public void UpdateAttack()
+    public void UpdateAttack() // Updates card attack value
     {
-        this.transform.Find("Attack").GetComponent<TextMeshPro>().text = cardScript.cardData.attack.ToString();
+        this.transform.Find("Attack").GetComponent<TextMeshPro>().text = cardScript.cardData.attack.ToString(); // Find the attack text object and set it equal to the card's attack
     }
-    public int DoAttack()
+    public int DoAttack() // Function for handling attack animation
     {
-        switch (attackState)
+        switch (attackState) // Pick which step the animation is currently in
         {
-            default:
-                Debug.Log("AttackState " + attackState + " on card " + this.cardData.name + " not recognised. Skipping to -1.");
-                animOgPos = this.transform.localPosition;
-                attackState = -1;
-                return 0;
-            case -1:
+            default: // If the step is not recognised
+                Debug.Log("AttackState " + attackState + " on card " + this.cardData.name + " not recognised. Skipping to -1."); // Inform the Unity console that something went wrong
+                attackState = -1; // Set attackState to -1
+                return 0; // Implies script is not done
+            case -1: // If animation has just ended
                 attackState = 0;
-                animTimer = 0;
-                this.transform.localPosition = animOgPos;
+                animTimer = 0; // Reset variables to their default values
+                this.transform.localPosition = animOgPos; // Move the card back to its original position
                 animOgPos = new Vector3();
                 animLastPos = new Vector3();
-                return 1;
-            case 0: // Lift card up
-                animTimer += Time.deltaTime;
-                if (animTimer == Time.deltaTime || animTimer == 0)
+                return 1; // Implies script is done
+            case 0: // First step of the animation, lifts card up
+                animTimer += Time.deltaTime; // Add the current deltaTime to the timer
+                if (animTimer == Time.deltaTime || animTimer == 0) // If this is the first frame
                 {
-                    animOgPos = this.transform.localPosition;
+                    animOgPos = this.transform.localPosition; // Store the card's position as animOgPos
                 }
-                else if (animTimer >= 0.2f)
+                else if (animTimer >= 0.2f) // If 0.2 seconds have passed
                 {
-                    animTimer = 0;
-                    attackState = 1;
-                    this.transform.localPosition = animOgPos + new Vector3(0, 0.04f, -0.03f);
-                    animLastPos = this.transform.localPosition;
+                    animTimer = 0; // Reset the timer
+                    attackState = 1; // Move to the next state
+                    this.transform.localPosition = animOgPos + new Vector3(0, 0.04f, -0.03f); // Move the card to the target position
+                    animLastPos = this.transform.localPosition; // Store this position as animLastPos
                 }
-                this.transform.localPosition = Vector3.Lerp(animOgPos, animOgPos + new Vector3(0, 0.04f, -0.03f), animTimer / 0.2f);
-                return 0;
-            case 1: // Throw card forward
-                animTimer += Time.deltaTime;
-                if (animTimer >= 0.1f)
+                this.transform.localPosition = Vector3.Lerp(animOgPos, animOgPos + new Vector3(0, 0.04f, -0.03f), animTimer / 0.2f); // Interpolate the card between ogPos and the new pog over 0.2s
+                return 0; // Implies script is not done
+            case 1: // Second step of the animation, throws card forward
+                animTimer += Time.deltaTime; // Add deltaTime to the timer
+                if (animTimer >= 0.1f) // If 0.1 seconds have passed
                 {
-                    animTimer = 0;
-                    attackState = 2;
-                    this.transform.localPosition = animLastPos + new Vector3(0, -0.1f, 0);
-                    animLastPos = this.transform.localPosition;
+                    animTimer = 0; // Reset the timer
+                    attackState = 2; // Move to the next state
+                    this.transform.localPosition = animLastPos + new Vector3(0, -0.1f, 0); // Set the card to its target position
+                    animLastPos = this.transform.localPosition; // Store this position as animLastPof
                 }
-                this.transform.localPosition = Vector3.Lerp(animLastPos, animLastPos + new Vector3(0, -0.1f, 0), animTimer / 0.1f);
-                return 0;
-            case 2: // Return card to og pos
-                animTimer += Time.deltaTime;
-                if (animTimer >= 0.3f)
+                this.transform.localPosition = Vector3.Lerp(animLastPos, animLastPos + new Vector3(0, -0.1f, 0), animTimer / 0.1f); // Interpolate the card between its last position and a new position over 0.1s
+                return 0; // Implies script is not done
+            case 2: // Third step of the animation, returns card to og position
+                animTimer += Time.deltaTime; // Add deltaTime to timer
+                if (animTimer >= 0.3f) // If 0.3 seconds have passed
                 {
-                    animTimer = 0;
-                    attackState = -1;
-                    this.transform.localPosition = animOgPos;
+                    animTimer = 0; // Reset the timer
+                    attackState = -1; // Move to the last state
+                    this.transform.localPosition = animOgPos; // Move the card to its original position
                 }
-                this.transform.localPosition = Vector3.Lerp(animLastPos, animOgPos, animTimer / 0.3f);
-                return 0;
+                this.transform.localPosition = Vector3.Lerp(animLastPos, animOgPos, animTimer / 0.3f); // Interpolate the card between its last position and its original position
+                return 0;  // Implies script is not done
         }
     }
-    public void ShowNada()
+    public void ShowNada() // Function for spawing and raising NADA, then destroying it after set amount of time
     {
-        switch (nadaTimer)
+        switch (nadaTimer) // Pick which state the function is in based on time passed
         {
-            case 0: // First loop
-                showingNada = true;
-                nada = Instantiate(nadaPrefab, new Vector3(), Quaternion.Euler(new Vector3(180 - mainCamera.transform.eulerAngles.x, mainCamera.transform.eulerAngles.y, mainCamera.transform.eulerAngles.z + 180)));
-                nada.transform.parent = this.transform;
-                nada.transform.localPosition = this.transform.localPosition + new Vector3(0, 0.07f, 0);
-                nadaTimer += Time.deltaTime;
+            case 0: // If this is the first loop
+                showingNada = true; // Ensure that the function is looped
+                nada = Instantiate(nadaPrefab, new Vector3(), Quaternion.Euler(new Vector3(180 - mainCamera.transform.eulerAngles.x, mainCamera.transform.eulerAngles.y, mainCamera.transform.eulerAngles.z + 180))); // Spawn NADA object
+                nada.transform.parent = this.transform; // Parent nada to the card
+                nada.transform.localPosition = this.transform.localPosition + new Vector3(0, 0.07f, 0); // Set the position of nada to the card + 0.07y
+                nadaTimer += Time.deltaTime; // Increment the timer
                 break;
-            default: // Currently running
-                nadaTimer += Time.deltaTime;
-                nada.transform.localPosition = Vector3.Lerp(this.transform.localPosition + new Vector3(0, 0.07f, 0), this.transform.localPosition + new Vector3(0, 0.14f, 0), nadaTimer / 1);
-                if (nadaTimer > 0.6f)
+            default: // If this is not the first or last loop
+                nadaTimer += Time.deltaTime; // Increment the timer
+                nada.transform.localPosition = Vector3.Lerp(this.transform.localPosition + new Vector3(0, 0.07f, 0), this.transform.localPosition + new Vector3(0, 0.14f, 0), nadaTimer / 1); // Interpolate the card between it's original position and a new position 0.07y away
+                if (nadaTimer > 0.6f) // If the timer is more than 0.6
                 {
-                    nadaTimer = 0.6f;
+                    nadaTimer = 0.6f; // Set the timer to 0.6
                 }
                 break;
-            case 0.6f: // When loop done
-                showingNada = false;
-                Debug.Log("yeag");
-                GameObject.Destroy(nada);
-                nada = null;
-                nadaTimer = 0;
+            case 0.6f: // If this is the last loop
+                showingNada = false; // Ensure the function is no londer looped
+                GameObject.Destroy(nada); // Destroy the nada object
+                nada = null; // Set the reference to the nada object to null
+                nadaTimer = 0; // Reset the timer
                 break;
         }
+    }
+    public void HandleSlapSprite(bool show) // Function for setting whether slap sprite is shown
+    {
+        showing = show; // Set showing to the value of show
     }
 }

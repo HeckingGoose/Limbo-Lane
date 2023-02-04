@@ -75,9 +75,11 @@ public class MainCardBattleHandler : MonoBehaviour
     #endregion
     private void Start()
     {
+        #region Setting up variables that cannot be setup outside of function
         boardCards = new GameObject[4, 4];
         mainCamera = Camera.main.gameObject; // Find the main camera gameObject in the scene
         mainCameraCam = Camera.main; // Find the main camera in the scene
+        #endregion
     }
     private void Update()
     {
@@ -98,13 +100,12 @@ public class MainCardBattleHandler : MonoBehaviour
         }
         #endregion
     }
-    public void StartCardBattle()
+    public void StartCardBattle() // Public function for starting a card battle
     {
-        inCardBattle = true;
-        CardBattle();
-        
+        inCardBattle = true; // States that the script is currently in a card battle
+        CardBattle();         // Calls the CardBattle method
     }
-    private void CardBattle()
+    private void CardBattle() // Main function for card battle
     {
         // Set inCardBattle to true
         if (enemy.ready)
@@ -185,9 +186,11 @@ public class MainCardBattleHandler : MonoBehaviour
                     SetPlayerPortrait("Alex");
                     SetEnemyPortrait(enemy.enemyName);
                     #endregion
+                    #region Misc
                     cardBattleHUD.SetActive(true); // Enable the card battling HUD
                     currentTurn = "Enemy"; // Set the turn to Player
                     GenerateDeck(); // Generate the player's deck
+                    #endregion
                     break;
                 case "player": // If the current turn is player
                     bool hitThing = false; // Create a new bool called hitThing and set it to false
@@ -197,6 +200,7 @@ public class MainCardBattleHandler : MonoBehaviour
                     {
                         if (hit.transform.tag == "PlayerBoardSpace") // If the object has no children
                         {
+                            #region Board has no card on space and card is selected
                             if (hit.transform.childCount == 0 && selecting) // If the object is a board space on the player's side
                             {
                                 hitThing = true; // Set hitThing to true
@@ -242,11 +246,11 @@ public class MainCardBattleHandler : MonoBehaviour
                                     UpdateCurrency(playerCurrency, enemy.currency); // update to use enemy currency
                                     #region Set all instances of the card to be in their 'on the board' state
                                     selectedCardScript.cardData.state = 2;
-                                    foreach (Card card in playerFullDeck.cards)
+                                    foreach (Card card in playerFullDeck.cards) // Loop through every card in the player's fullDeck
                                     {
-                                        if (card.ID == selectedCardScript.cardData.ID)
+                                        if (card.ID == selectedCardScript.cardData.ID) // If the card ID matches the selected card's ID
                                         {
-                                            card.state = 2;
+                                            card.state = 2; // Set the card's state to 2
                                         }
                                     }
                                     #endregion
@@ -282,41 +286,45 @@ public class MainCardBattleHandler : MonoBehaviour
                                     GenerateDeck(); // Generate the player's deck again
                                 }
                             }
+                            #endregion
+                            #region Board has card on space and card is selected
                             else if (hit.transform.childCount == 1 && selecting)
                             {
                                 selectedCardScript.Select(); // Move the selected card back to its selecting position
                             }
+                            #endregion
+                            #region Card is potentially being slapped
                             else if (hit.transform.childCount == 1)
                             {
-                                Debug.Log("SHOW CARD CAN BE SLAPPED");
                                 // HANDLE CARD SLAPPING HERE
-                                if (Input.GetAxis("SecondaryAction") > 0 && !mouseDown)
+                                hit.transform.GetChild(0).GetComponent<CardScript>().HandleSlapSprite(true); // Running this pretty much once per frame isn't great
+                                if (Input.GetAxis("SecondaryAction") > 0 && !mouseDown) // If the mouse is clicked
                                 {
-                                    selectedCard = hit.transform.GetChild(0).gameObject;
-                                    selectedCardScript = selectedCard.GetComponent<CardScript>();
-                                    mouseDown = true;
-                                    try
+                                    selectedCard = hit.transform.GetChild(0).gameObject; // Set selected card to the card that was clicked
+                                    selectedCardScript = selectedCard.GetComponent<CardScript>(); // Set selected card script equal to the script on that card
+                                    mouseDown = true; // Set mouseDown to true
+                                    try // Try to run the below code
                                     {
-                                        Debug.Log("Card slapped.");
-                                        playerCurrency += selectedCardScript.cardData.cost;
-                                        foreach (Card card in playerFullDeck.cards)
+                                        playerCurrency += selectedCardScript.cardData.cost; // Increase player currency by the card cost
+                                        foreach (Card card in playerFullDeck.cards) // Loop through every card in the player's deck
                                         {
-                                            if (card != null && card.ID == selectedCardScript.cardData.ID)
+                                            if (card != null && card.ID == selectedCardScript.cardData.ID) // If the card ID matches that of the selected card
                                             {
-                                                card.state = 0;
+                                                card.state = 0; // Set the card state to 0
                                             }
                                         }
-                                        GameObject.Destroy(selectedCard);
+                                        GameObject.Destroy(selectedCard); // Desctroy the card object
                                         selectedCard = null;
-                                        selectedCardScript = null;
+                                        selectedCardScript = null; // Reset all references to the selected card
                                         selectedCardIndex = -1;
-                                        UpdateCurrency(playerCurrency, enemy.currency);
+                                        UpdateCurrency(playerCurrency, enemy.currency); // Update the player and enemy currency icons
                                     }
-                                    catch
+                                    catch // If the above code fails to run
                                     {
-                                        Debug.Log("Unable to slap card.");
+                                        Debug.Log("Unable to slap card."); // Inform the Unity console that something went wrong
                                     }
                                 }
+#endregion
                             }
                         }
                         else // If the raycast does not hit an object
@@ -336,6 +344,7 @@ public class MainCardBattleHandler : MonoBehaviour
                         }
                         catch { }
                     }
+                    #region Selecting a card
                     if (!mouseDown && Input.GetAxis("PrimaryAction") > 0 && !hitThing) // If the player clicks the mouse, mouseDown is false and the raycast did not hit a valid board space
                     {
                         selecting = false; // Set selecting to false
@@ -346,7 +355,7 @@ public class MainCardBattleHandler : MonoBehaviour
                         {
                             for (int i = 0; i < playerCardObjects.Count; i++) // Loop through every card in the player's deck
                             {
-                                try
+                                try // Try to run the below code
                                 {
                                     CardScript script = playerCardObjects[i].GetComponent<CardScript>(); // Find the cardScript component of the card
                                     script.Unselect(); // Unselect the card
@@ -360,13 +369,14 @@ public class MainCardBattleHandler : MonoBehaviour
                                         selectedCardScript = script; // Set the selectedCardScript to script
                                     }
                                 }
-                                catch
+                                catch // If the above code fails to run
                                 {
-                                    Debug.Log("Leaked card at index " + i);
+                                    Debug.Log("Leaked card at index " + i); // Inform the Unity console that something has gone wrong
                                 }
                             }
                         }
                     }
+                    #endregion
                     #region Handle if the phisch pile is clicked on
                     if (phischScript.bellClicked) // If the phisch pile is clicked
                     {
@@ -396,18 +406,21 @@ public class MainCardBattleHandler : MonoBehaviour
                     #endregion
                     break;
                 case "enemy": // If the current turn is enemy
+                    #region Call enemy function and move to next turn
                     boardCards = enemy.ComputeTurn(boardCards);// pass script onto enemy script for turn
                     bellClicked = false; // Set bellClicked to false
                     currentTurn = "Player"; // Switch the turn to computeTurn
+                    #endregion
                     break;
                 case "computeturn":
-                    switch (waitingState)
+                    switch (waitingState) // Pick which state of animation the function is currently in
                     {
-                        default:
-                            Debug.Log("Waiting state not recognised! Defaulting to 0.");
-                            waitingState = 0;
+                        default: // If the state is not recognised
+                            Debug.Log("Waiting state not recognised! Defaulting to 0."); // Inform the Unity console that something went wrong
+                            waitingState = 0; // Set waitingState to 0
                             break;
-                        case 0:
+                        case 0: // If card attacks need to be calculated
+                            #region Calculate card attacks through black magic
                             if (column >= 4)
                             {
                                 currentTurn = "Enemy"; // Set turn to enemy
@@ -497,38 +510,39 @@ public class MainCardBattleHandler : MonoBehaviour
                             column++;
                             GenerateDeck(); // Re-generate the deck
                             waitingState = 1;
+                            #endregion
                             break;
-                        case 1: // Do card attacking
-                            if (attackCard == null)
+                        case 1: // Handle card attacking animation
+                            if (attackCard == null) // If there is no attacking card
                             {
-                                waitingState = 2;
+                                waitingState = 2; // Move to the next state
                             }
-                            else
+                            else // Otherwise
                             {
-                                if (attackCard.cardData.attack > 0)
+                                if (attackCard.cardData.attack > 0) // If the card has an attack value
                                 {
-                                    waitingState += attackCard.DoAttack();
+                                    waitingState += attackCard.DoAttack(); // Run the attack animation until it finishes, and then increment waitingState
                                 }
-                                else
+                                else // Otherwise
                                 {
-                                    waitingState = 2;
+                                    waitingState = 2; // Move to the next state
                                 }
                             }
                             break;
-                        case 2: // Do card defending
-                            if (defendCard == null)
+                        case 2: // Handle card attacking animation for defending card
+                            if (defendCard == null) // If there is no defending card
                             {
-                                waitingState = 3;
+                                waitingState = 3; // Move to the next state
                             }
-                            else
+                            else // Otherwise
                             {
-                                if (defendCard.cardData.attack > 0)
+                                if (defendCard.cardData.attack > 0) // If the defending card has an attack value
                                 {
-                                    waitingState += defendCard.DoAttack();
+                                    waitingState += defendCard.DoAttack(); // Run the attack animation until it finishes, and then increment waitingState
                                 }
-                                else
+                                else // Otherwise
                                 {
-                                    waitingState = 3;
+                                    waitingState = 3; // Move to the next state
                                 }
                             }
                             break;
@@ -542,7 +556,7 @@ public class MainCardBattleHandler : MonoBehaviour
                             { // Enemy wins
                                 currentTurn = "EnemyWin"; // Switch turn to enemyTurn
                             }
-                            waitingState = 0;
+                            waitingState = 0; // Move back to the first state
                             break;
                     }
                     break;
@@ -591,6 +605,7 @@ public class MainCardBattleHandler : MonoBehaviour
                     }
                     try // Try to run the below code
                     {
+                        sceneStateLoader.locationState++;
                         sceneStateLoader.Run(); // Load the new scene state
                     }
                     catch // If the above code fails to run
@@ -601,7 +616,7 @@ public class MainCardBattleHandler : MonoBehaviour
                     break;
             }
             Vector2 screenSize = new Vector2(Camera.main.scaledPixelWidth, Camera.main.scaledPixelHeight);
-            float mousePositionScaleX = Screen.currentResolution.width / screenSize.x;
+            float mousePositionScaleX = Screen.currentResolution.width / screenSize.x; // Fetch data about the screen and scale it to values that are actually useful
             float mousePositionScaleY = mousePositionScaleX;
             if (Input.mousePosition.x >= 0 && Input.mousePosition.y >= 0 && Input.mousePosition.x <= screenSize.x && Input.mousePosition.y <= screenSize.y) // check if mouse is actually in game window
             {
@@ -609,7 +624,7 @@ public class MainCardBattleHandler : MonoBehaviour
                 Ray cardRay = mainCameraCam.ScreenPointToRay(Input.mousePosition); // Create a new raycast
                 if (Physics.Raycast(cardRay, out hitCard))
                 {
-                    ShowCardInfo(hitCard, screenSize, mousePositionScaleX, mousePositionScaleY); // figure out why this doesn't work
+                    ShowCardInfo(hitCard, screenSize, mousePositionScaleX, mousePositionScaleY); // figure out why this doesn't work properly
                 }
                 else
                 {
@@ -618,7 +633,7 @@ public class MainCardBattleHandler : MonoBehaviour
             }
         }
     }
-    private void ShowCardInfo(RaycastHit card, Vector2 screenSize, float mousePositionScaleX, float mousePositionScaleY)
+    private void ShowCardInfo(RaycastHit card, Vector2 screenSize, float mousePositionScaleX, float mousePositionScaleY) // !Function still not finished
     {
         if ((card.transform.tag.ToLower() == "enemyboardspace" || card.transform.tag.ToLower() == "playerboardspace"))
         {
@@ -728,67 +743,67 @@ public class MainCardBattleHandler : MonoBehaviour
             }
         }
     }
-    private void HideCardInfo()
+    private void HideCardInfo() // Function for removing card info prompt
     {
-        if (showingPrompt)
+        if (showingPrompt) // If there is a prompt
         {
-            try
+            try // Try to run the below code
             {
-                GameObject.Destroy(createdPrompt);
-                showingPrompt = false;
+                GameObject.Destroy(createdPrompt); // Destroy the prompt
+                showingPrompt = false; // Set all relevant variables to default values
                 createdPrompt = null;
                 createdPromptSize = new Vector2();
             }
-            catch
+            catch // If the above code fails to run
             {
-                Debug.Log("Unable to find prompt in scene.");
+                Debug.Log("Unable to find prompt in scene."); // Inform the Unity console that something went wrong
             }
         }
     }
-    private (Card, Card) DoAttack(Card attackingCard, Card defendingCard)
+    private (Card, Card) DoAttack(Card attackingCard, Card defendingCard) // Function for handling attacks between two cards
     {
         System.Random random = new System.Random();
-        int damageDealt = attackingCard.attack;
+        int damageDealt = attackingCard.attack; // Define useful values for later
         bool crit = false;
-        switch (attackingCard.ability)
+        switch (attackingCard.ability) // Check which ability the attacking card has
         {
-            default:
-                Debug.Log("Ability " + attackingCard.ability + " not recognised on attacking card.");
+            default: // If the ability is not recognised
+                Debug.Log("Ability " + attackingCard.ability + " not recognised on attacking card."); // Inform the Unity console that something went wrong
                 break;
             case 0: // 25% chance to crit
-                if (random.Next(0,100) < 25)
+                if (random.Next(0,100) < 25) // 25% chance of being true
                 {
-                    damageDealt = damageDealt * 2;
-                    crit = true;
+                    damageDealt = damageDealt * 2; // Double damage dealt
+                    crit = true; // Set crit to true
                     //Debug.Log("Did crit");
                 }
                 break;
         }
-        switch (defendingCard.ability)
+        switch (defendingCard.ability) // CHeck which ability the defending card has
         {
-            default:
-                Debug.Log("Ability " + defendingCard.ability + " not recognised on defending card.");
+            default: // If the ability is not recognised
+                Debug.Log("Ability " + defendingCard.ability + " not recognised on defending card."); // Inform the Unity console that something went wrong
                 break;
             case 2: // reflect damage
-                if (random.Next(0, 100) < 10)
+                if (random.Next(0, 100) < 10) // 10% chance of running
                 {
-                    defendingCard.health += damageDealt;
-                    attackingCard.health -= damageDealt;
+                    defendingCard.health += damageDealt; // Add any damage dealt back to the defending card's health
+                    attackingCard.health -= damageDealt; // Damage the attacking card with its own damage
                     //Debug.Log("Reflected damage");
                 }
                 break;
             case 3: // immune to crits
-                if (crit)
+                if (crit) // If the card critted
                 {
                     //Debug.Log("Blocked crit");
-                    damageDealt = damageDealt / 2;
+                    damageDealt = damageDealt / 2; // Half the damage so it is only a regular amount of damage
                 }
                 break;
         }
-        defendingCard.health -= damageDealt;
-        return (attackingCard, defendingCard);
+        defendingCard.health -= damageDealt; // Actually remove health from defending card equal to the damageDealt value
+        return (attackingCard, defendingCard); // Return attacking and defending card
     }
-    private (CardScript, CardScript) CalculateAttack(int column, int[] columnState, GameObject[] columnCardsObj)
+    private (CardScript, CardScript) CalculateAttack(int column, int[] columnState, GameObject[] columnCardsObj) // This function is just a large collection of conditions for setting which cards are supposed to attack which
     {
         string state = "";
         CardScript attackingCard = null;

@@ -6,8 +6,10 @@ using UnityEngine.UI;
 public class EnemyScript : MonoBehaviour
 {
     #region Public variables for main script
+    [HideInInspector]
     public int health;
     public string enemyName;
+    [HideInInspector]
     public Deck fullDeck;
     [HideInInspector]
     public int currency;
@@ -20,7 +22,7 @@ public class EnemyScript : MonoBehaviour
     private GameObject boardObject;
     private int maxHealth;
     private int handSize;
-    private Deck deck;
+    private Deck deck; // Setup other variables (this may need organising)
     private GameObject deckObject;
     private List<GameObject> cardObjects;
     private System.Random random;
@@ -54,6 +56,22 @@ public class EnemyScript : MonoBehaviour
                 deck = mainScript.PopulateDeck(fullDeck, handSize, deck);
                 GenerateDeck();
                 break;
+            case "alyx": // If enemy name is alyx
+                currency = 5;
+                health = 4;
+                handSize = 5;
+                fullDeck = new Deck();
+                deck = new Deck();
+                deck.cards = new Card[handSize];
+                fullDeck.cards = new Card[7];
+                fullDeck.cards[0] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[1] = mainScript.CreateCardData("Reaper"); // Do same as above but with values tailored to this character
+                fullDeck.cards[2] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[3] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[4] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[5] = mainScript.CreateCardData("Rock");
+                fullDeck.cards[6] = mainScript.CreateCardData("Rock");
+                break;
         }
         maxHealth = health; // Set maxHealth equal to health
         ready = true; // Set ready to true
@@ -61,19 +79,19 @@ public class EnemyScript : MonoBehaviour
     private void GenerateDeck()
     {
         #region Destroy old deck
-        try
+        try // Try to run the below code
         {
-            GameObject.Destroy(GameObject.Find("EnemyDeck"));
+            GameObject.Destroy(GameObject.Find("EnemyDeck")); // Try to destroy the enemy deck
         }
-        catch
+        catch // If the above code fails to run
         {
-            Debug.Log("Unable to find EnemyDeck");
+            Debug.Log("Unable to find EnemyDeck"); // Inform the Unity console that something went wrong
         }
         #endregion
         #region Create new deck
         deckObject = new GameObject();
         deckObject.transform.parent = this.transform;
-        deckObject.transform.localPosition = new Vector3(0, 0, 0);
+        deckObject.transform.localPosition = new Vector3(0, 0, 0); // Create a new deck object and set some default values for it
         deckObject.name = "EnemyDeck";
         deckObject.transform.localScale = new Vector3(1, 1, 1);
         deckObject.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));

@@ -11,3 +11,4 @@ public class LauchCardBattleTest : MonoBehaviour
         mainCardBattleHandler.StartCardBattle();
     }
 }
+// Test script that simply starts a card battle on scene start, to help test the card battling system
