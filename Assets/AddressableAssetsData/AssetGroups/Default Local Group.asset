@@ -173,6 +173,24 @@ MonoBehaviour:
     m_SerializedLabels: []
     m_MainAsset: {fileID: 0}
     m_TargetAsset: {fileID: 0}
+  - m_GUID: 92c0a84c6a49d764d9001bd07615efdf
+    m_Address: Assets/Oyster/Sprites/Characters/Alex/ThumbsUp.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 7d4e3d758e9bf214c984f6d835a8b00e
+    m_Address: Assets/Oyster/Sprites/Characters/Alex/AlexTooHappy.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: f3365b44f8f264a498906e8d9507924e
+    m_Address: Assets/Oyster/Sprites/Characters/Alex/NotThumbsUp.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 61e57010f7958304d98f7fd5618c7f0c, type: 2}
   m_SchemaSet:

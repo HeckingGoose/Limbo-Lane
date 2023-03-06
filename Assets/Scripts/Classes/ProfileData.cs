@@ -7,11 +7,13 @@ public class ProfileData
     public int matchStartingHealth;
     public int matchStartingCurrency;
     public string location;
+    public int level;
+    public int xp;
     public string[] deck;
     public int handSize;
     public ObjectState[] enemyStates;
     public ObjectState[] locationStates;
-    public static ProfileData Create(string profileName, string version, int currency, int matchStartingHealth, int matchStartingCurrency, string location, string[] deck, int handSize, ObjectState[] enemyStates, ObjectState[] locationStates) // Tell Unity which variables are used
+    public static ProfileData Create(string profileName, string version, int currency, int matchStartingHealth, int matchStartingCurrency, string location, int level, int xp, string[] deck, int handSize, ObjectState[] enemyStates, ObjectState[] locationStates) // Tell Unity which variables are used
     {
         ProfileData data = new ProfileData();
         data.name = profileName; // Create and return an instance of itself
@@ -20,6 +22,8 @@ public class ProfileData
         data.matchStartingHealth = matchStartingHealth;
         data.matchStartingCurrency = matchStartingCurrency;
         data.location = location;
+        data.level = level;
+        data.xp = xp;
         data.deck = deck;
         data.handSize = handSize;
         data.enemyStates = enemyStates;

@@ -23,6 +23,9 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/CardBattleTest.unity
     guid: bf13c5e069ec52b4da03e0f157d13a9a
+  - enabled: 1
+    path: Assets/Scenes/DemoEnd.unity
+    guid: f31eb46ac0c9e2f43941b34f8f239bb9
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: d86403e65819bee48ad2a50af9d058d9, type: 2}
     com.unity.input.settings: {fileID: 11400000, guid: 521382b8fb0880c4196923a745c086e4, type: 2}

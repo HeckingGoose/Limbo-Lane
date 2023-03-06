@@ -9,9 +9,15 @@ public class MainCardBattleHandler : MonoBehaviour
 {
     #region Variables that can be accessed from inspector
     [SerializeField]
+    private ProfileHandler profileHandler;
+    [SerializeField]
     private SceneStateLoader sceneStateLoader;
     [SerializeField]
     private GameObject cardBattleHUD;
+    [SerializeField]
+    private GameObject gameEndPrompt;
+    [SerializeField]
+    private RectTransform HUD;
     [SerializeField] // Set up a lot of variables
     private GameObject cardPrefab;
     [SerializeField]
@@ -25,8 +31,19 @@ public class MainCardBattleHandler : MonoBehaviour
     [SerializeField]
     private BellScript bellScript;
     [SerializeField]
+    private Sprite bellSprite;
+    [SerializeField]
     private BellScript phischScript;
-    private GameObject[,] boardCards;
+    [SerializeField]
+    private Sprite phischPileSprite;
+    [SerializeField]
+    private GameObject playerDeckPile;
+    [SerializeField]
+    private DeckPileScript playerDeckPileScript;
+    [SerializeField]
+    private Sprite deckPileSprite;
+    [SerializeField]
+    private Material defaultCardMaterial;
     [SerializeField]
     private Material[] cardMaterials;
     [SerializeField]
@@ -40,21 +57,29 @@ public class MainCardBattleHandler : MonoBehaviour
     #endregion
     #region Player Variables
     private Deck playerFullDeck;
-    private Deck playerDeck;
+    private Deck playerDeck; // Variables related specifically to the player
     private int playerHandSize;
     [HideInInspector]
     public int playerCurrency;
     private int health;
     private int maxHealth;
+    private int level;
+    private int xp;
+    private int levelXp;
     #endregion
     #region Enemy Variables
-    #endregion
+    #endregion // Practically unused since enemy script contains most of these
     #region Other
-    private GameObject mainCamera;
+    private System.Random random;
+    private GameObject[,] boardCards;
+    private GameObject mainCamera; // Unsorted variables
     private GameObject playerDeckObject;
     private List<GameObject> playerCardObjects;
     private GameObject selectedCard;
     private CardScript selectedCardScript;
+    private EndGamePrompt gameEndPromptScript;
+    private bool continueClicked = false;
+    private bool gameEndFirstLoop = true;
     private int selectedCardIndex;
     private bool selecting = false;
     private float totalRange = 0.6f;
@@ -64,19 +89,31 @@ public class MainCardBattleHandler : MonoBehaviour
     private bool drawnPhisch = false;
     private Camera mainCameraCam;
     private bool bellClicked = false;
+    private bool showingBellPrompt = false;
+    private GameObject bellPrompt;
     private int currentID = 0;
     private bool showingPrompt = false;
     private GameObject createdPrompt = null;
-    private Vector2 createdPromptSize;
+    private RectTransform createdPromptSize;
     private int column = 0;
     private int waitingState = 0;
     private CardScript attackCard;
     private CardScript defendCard;
+    private bool showingDeckSprite = false;
+    private GameObject deckPrompt = null;
+    private bool showingPhischSprite = false;
+    private GameObject phischPrompt = null;
+    private int bumpStateBy = 0;
     #endregion
     private void Start()
     {
+        #region Sorting prompts
+        gameEndPrompt.SetActive(false);
+        gameEndPromptScript = gameEndPrompt.GetComponent<EndGamePrompt>();
+        #endregion
         #region Setting up variables that cannot be setup outside of function
-        boardCards = new GameObject[4, 4];
+        random = new System.Random();
+        boardCards = new GameObject[4, 4]; // Create a new array for boardCards
         mainCamera = Camera.main.gameObject; // Find the main camera gameObject in the scene
         mainCameraCam = Camera.main; // Find the main camera in the scene
         #endregion
@@ -102,8 +139,10 @@ public class MainCardBattleHandler : MonoBehaviour
     }
     public void StartCardBattle() // Public function for starting a card battle
     {
+        #region Place game into card battle
         inCardBattle = true; // States that the script is currently in a card battle
         CardBattle();         // Calls the CardBattle method
+        #endregion
     }
     private void CardBattle() // Main function for card battle
     {
@@ -113,37 +152,55 @@ public class MainCardBattleHandler : MonoBehaviour
             switch (currentTurn.ToLower()) // Pick which turn it is
             {
                 default: // If none of the below cases match the current turn
-                    Debug.Log("Turn type '" + currentTurn + "' not recognised."); // Inform the Unity console that the current turn does not exist
+                    Debug.LogWarning("Turn type '" + currentTurn + "' not recognised."); // Inform the Unity console that the current turn does not exist
                     break;
                 case "setup": // If the turn is 'setup', A.K.A: setting up the card battle
                     #region Load variables from persistent variables
-                    if (PersistentVariables.matchStartingHealth != -1)
+                    if (PersistentVariables.profileLevel != -1)
                     {
-                        health = PersistentVariables.matchStartingHealth;
+                        level = PersistentVariables.profileLevel;
                     }
                     else
                     {
-                        Debug.Log("Unable to load match starting health! Defaulting to 5");
-                        health = 5;
+                        Debug.LogWarning("Unable to load player level! Defaulting to 1.");
+                        level = 20;
                     }
-                    maxHealth = health;
-                    if (PersistentVariables.matchStartingCurrency != -1)
+                    if (PersistentVariables.profileXp != -1)
                     {
-                        playerCurrency = PersistentVariables.matchStartingCurrency;
-                    }
-                    else
-                    {
-                        Debug.Log("Unable to load player starting currency! Defaulting to 5");
-                        playerCurrency = 5;
-                    }
-                    if (PersistentVariables.handSize != -1)
-                    {
-                        playerHandSize = PersistentVariables.handSize;
+                        xp = PersistentVariables.profileXp;
                     }
                     else
                     {
-                        Debug.Log("Unable to load player hand size! Defaulting to 7.");
-                        playerHandSize = 7;
+                        Debug.LogWarning("Unable to load player xp! Defaulting to 0");
+                        xp = 0;
+                    }
+                    if (PersistentVariables.matchStartingHealth != -1) // If persistant variables has this value set up
+                    {
+                        health = PersistentVariables.matchStartingHealth; // Load the value
+                    }
+                    else // Otherwise
+                    {
+                        Debug.LogWarning("Unable to load match starting health! Defaulting to 5"); // Inform the Unity console that default values are being used
+                        health = 5; // Set a default value
+                    }
+                    maxHealth = health; // Set maxHealth to health
+                    if (PersistentVariables.matchStartingCurrency != -1) // If persistant variables has this value set up
+                    {
+                        playerCurrency = PersistentVariables.matchStartingCurrency; // Load the value
+                    }
+                    else // Otherwise
+                    {
+                        Debug.LogWarning("Unable to load player starting currency! Defaulting to 5"); // Inform the Unity console that default values are being used
+                        playerCurrency = 5; // Set a default value
+                    }
+                    if (PersistentVariables.handSize != -1) // If persistant variables had this value set up
+                    {
+                        playerHandSize = PersistentVariables.handSize; // Load the value
+                    }
+                    else // Otherwise
+                    {
+                        Debug.LogWarning("Unable to load player hand size! Defaulting to 7."); // Inform the Unity console that default values are being used
+                        playerHandSize = 7; // Set a default value
                     }
                     if (PersistentVariables.profileName != "")// If a profile is loaded
                     {
@@ -159,7 +216,7 @@ public class MainCardBattleHandler : MonoBehaviour
                     }
                     else // If no profile is loaded - intended for testing
                     {
-                        Debug.Log("No profile is currently loaded! Continuing with default deck."); // Inform the Unity console that no profile is loaded
+                        Debug.LogWarning("No profile is currently loaded! Continuing with default deck."); // Inform the Unity console that no profile is loaded
                         playerFullDeck = new Deck(); // Create a new deck to store all of the player's cards
                         playerFullDeck.cards = new Card[10]; // Set the size of the full deck to the number of cards the player has
                         playerFullDeck.cards[0] = CreateCardData("Reaper");
@@ -179,10 +236,12 @@ public class MainCardBattleHandler : MonoBehaviour
                     playerDeck = new Deck(); // Create a new deck to store the player's hand
                     playerDeck.cards = new Card[playerHandSize]; // Initialise the deck in playerDeck to the size of the player's hand
                     playerDeck = PopulateDeck(playerFullDeck, playerHandSize, playerDeck); // Call populate deck to fill the player's deck
+                    playerDeckPileScript.RePile(playerFullDeck, playerDeckPile); // Call method to generate which cards are free
+                    playerDeckPileScript.GeneratePile(playerDeckPile, cardMaterials); // Call method to generate pile object based on array generated above
                     #endregion
                     #region Setup the UI
                     UpdateHealth();
-                    UpdateCurrency(playerCurrency, enemy.currency); // update to use enemy currency
+                    UpdateCurrency(playerCurrency, enemy.currency); // Call functions to load objects and values for the UI elements
                     SetPlayerPortrait("Alex");
                     SetEnemyPortrait(enemy.enemyName);
                     #endregion
@@ -190,9 +249,12 @@ public class MainCardBattleHandler : MonoBehaviour
                     cardBattleHUD.SetActive(true); // Enable the card battling HUD
                     currentTurn = "Enemy"; // Set the turn to Player
                     GenerateDeck(); // Generate the player's deck
+                    continueClicked = false;
+                    levelXp = Convert.ToInt32(((Math.Pow(Convert.ToDouble(level), 1.4) + 25) / 4) + 4);
                     #endregion
                     break;
                 case "player": // If the current turn is player
+                    #region Do player turn
                     bool hitThing = false; // Create a new bool called hitThing and set it to false
                     RaycastHit hit; // Create a new raycasthit object
                     Ray ray = mainCameraCam.ScreenPointToRay(Input.mousePosition); // Create a new raycast
@@ -288,15 +350,14 @@ public class MainCardBattleHandler : MonoBehaviour
                             }
                             #endregion
                             #region Board has card on space and card is selected
-                            else if (hit.transform.childCount == 1 && selecting)
+                            else if (hit.transform.childCount == 1 && selecting) // If the object has a singular child and a card is being selected
                             {
                                 selectedCardScript.Select(); // Move the selected card back to its selecting position
                             }
                             #endregion
                             #region Card is potentially being slapped
-                            else if (hit.transform.childCount == 1)
+                            else if (hit.transform.childCount == 1) // If the object has a child
                             {
-                                // HANDLE CARD SLAPPING HERE
                                 hit.transform.GetChild(0).GetComponent<CardScript>().HandleSlapSprite(true); // Running this pretty much once per frame isn't great
                                 if (Input.GetAxis("SecondaryAction") > 0 && !mouseDown) // If the mouse is clicked
                                 {
@@ -310,7 +371,7 @@ public class MainCardBattleHandler : MonoBehaviour
                                         {
                                             if (card != null && card.ID == selectedCardScript.cardData.ID) // If the card ID matches that of the selected card
                                             {
-                                                card.state = 0; // Set the card state to 0
+                                                card.state = 3; // Set the card state to 3
                                             }
                                         }
                                         GameObject.Destroy(selectedCard); // Desctroy the card object
@@ -324,7 +385,7 @@ public class MainCardBattleHandler : MonoBehaviour
                                         Debug.Log("Unable to slap card."); // Inform the Unity console that something went wrong
                                     }
                                 }
-#endregion
+                            #endregion
                             }
                         }
                         else // If the raycast does not hit an object
@@ -375,6 +436,80 @@ public class MainCardBattleHandler : MonoBehaviour
                                 }
                             }
                         }
+                        #region Handle if player full deck is clicked on
+                        if (playerDeckPileScript.mouseOver == true) // If the mouse is over the player's deck pile
+                        {
+                            //
+                            if (playerDeck.cards.Length < playerHandSize) // If the player's deck is not more than or equal to their hand size
+                            {
+                                Card newCard = playerDeckPileScript.DrawCard(playerFullDeck, playerDeckPile);
+                                playerDeckPileScript.RePile(playerFullDeck, playerDeckPile); // Draw a card and then repile
+                                playerDeckPileScript.GeneratePile(playerDeckPile, cardMaterials);
+                                if (newCard != null) // If the card was drawn correctly
+                                {
+                                    Deck temp = new Deck();
+                                    temp.cards = new Card[playerDeck.cards.Length + 1]; // Remake the player's deck to be +1 in length
+                                    for (int i = 0; i < playerDeck.cards.Length; i++)
+                                    {
+                                        temp.cards[i] = playerDeck.cards[i];
+                                    }
+                                    playerDeck = temp;
+                                    playerDeck.cards[playerDeck.cards.Length - 1] = newCard; // Add the new card to the player's deck
+                                    GenerateDeck(); // Re-generate the player's deck object
+                                }
+                                else // Otherwise
+                                {
+                                    Debug.Log("No cards to draw"); // Inform the Unity console that there are no cards left
+                                }
+                            }
+                        }
+                        #endregion
+                    }
+                    #endregion
+                    #region Showing deck pile prompt
+                    if (playerDeckPileScript.mouseOver)
+                    {
+                        Vector2 mousePosition = ConvertMouseToCanvasUnits(HUD);
+                        switch (showingDeckSprite)
+                        {
+                            case false: // first loop of bell prompt needing to be shown
+                                deckPrompt = CreatePrompt("DeckPrompt", deckPileSprite, new Vector2(256, 128), mousePosition, HUD);
+                                showingDeckSprite = true;
+                                break;
+                            case true: // every other loop of the bell prompt needing to be shown
+                                Vector2 offset = deckPrompt.GetComponent<RectTransform>().sizeDelta / 2;
+                                deckPrompt.transform.localPosition = mousePosition - offset;
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        showingDeckSprite = false;
+                        GameObject.Destroy(deckPrompt);
+                        deckPrompt = null;
+                    }
+                    #endregion
+                    #region Showing Phisch pile prompt
+                    if (phischScript.mouseOver)
+                    {
+                        Vector2 mousePosition = ConvertMouseToCanvasUnits(HUD);
+                        switch (showingPhischSprite)
+                        {
+                            case false: // first loop of bell prompt needing to be shown
+                                phischPrompt = CreatePrompt("PhischPrompt", phischPileSprite, new Vector2(256, 128), mousePosition, HUD);
+                                showingPhischSprite = true;
+                                break;
+                            case true: // every other loop of the bell prompt needing to be shown
+                                Vector2 offset = phischPrompt.GetComponent<RectTransform>().sizeDelta / 2;
+                                phischPrompt.transform.localPosition = mousePosition - offset;
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        showingPhischSprite = false;
+                        GameObject.Destroy(phischPrompt);
+                        phischPrompt = null;
                     }
                     #endregion
                     #region Handle if the phisch pile is clicked on
@@ -403,6 +538,31 @@ public class MainCardBattleHandler : MonoBehaviour
                         drawnPhisch = false; // Set drawnPhisch to false
                         bellClicked = true;
                     }
+                    if (bellScript.mouseOver)
+                    {
+                        Vector2 mousePosition = ConvertMouseToCanvasUnits(HUD);
+                        switch (showingBellPrompt)
+                        {
+                            case false: // first loop of bell prompt needing to be shown
+                                bellPrompt = CreatePrompt("BellPrompt", bellSprite, new Vector2 (256, 128), mousePosition, HUD);
+                                showingBellPrompt = true;
+                                break;
+                            case true: // every other loop of the bell prompt needing to be shown
+                                Vector2 offset = bellPrompt.GetComponent<RectTransform>().sizeDelta / 2;
+                                bellPrompt.transform.localPosition = mousePosition - offset;
+                                break;
+                        }
+                    }
+                    else // when mouse is no longer over bell prompt
+                    {
+                        if (showingBellPrompt)
+                        {
+                            showingBellPrompt = false;
+                            GameObject.Destroy(bellPrompt);
+                            bellPrompt = null;
+                        }
+                    }
+                    #endregion
                     #endregion
                     break;
                 case "enemy": // If the current turn is enemy
@@ -413,6 +573,13 @@ public class MainCardBattleHandler : MonoBehaviour
                     #endregion
                     break;
                 case "computeturn":
+                    #region Do turn
+                    showingBellPrompt = false;
+                    showingDeckSprite = false;
+                    showingPhischSprite = false;
+                    GameObject.Destroy(bellPrompt);
+                    GameObject.Destroy(deckPrompt);
+                    GameObject.Destroy(phischPrompt);
                     switch (waitingState) // Pick which state of animation the function is currently in
                     {
                         default: // If the state is not recognised
@@ -421,12 +588,16 @@ public class MainCardBattleHandler : MonoBehaviour
                             break;
                         case 0: // If card attacks need to be calculated
                             #region Calculate card attacks through black magic
-                            if (column >= 4)
+                            //playerDeck = PopulateDeck(playerFullDeck, playerHandSize, playerDeck); // Populate the player deck <- figure out why this doesn't work
+                            foreach (Card card in playerFullDeck.cards)
                             {
-                                currentTurn = "Enemy"; // Set turn to enemy
-                                column = 0;
+                                if (card.state == 3)
+                                {
+                                    card.state = 0;
+                                }
                             }
-                            playerDeck = PopulateDeck(playerFullDeck, playerHandSize, playerDeck); // Populate the player deck <- figure out why this doesn't work
+                            playerDeckPileScript.RePile(playerFullDeck, playerDeckPile);
+                            playerDeckPileScript.GeneratePile(playerDeckPile, cardMaterials);
                             GameObject playerFrontCard = null;
                             GameObject playerBackCard = null; // Setup some variables for later use
                             GameObject enemyFrontCard = null;
@@ -434,7 +605,7 @@ public class MainCardBattleHandler : MonoBehaviour
                             int[] columnState = new int[4] { 0, 0, 0, 0 };
                             for (int row = 0; row < 4; row++) // Loop through every row
                             {
-                                switch (row) // Switch between row - column * 4
+                                switch (row) // Switch between row
                                 {
                                     default: // If none of the below cases match
                                         Debug.Log("Board space (" + row + "," + column + ") not recognised."); // Inform the Unity console that something went wrong
@@ -507,7 +678,6 @@ public class MainCardBattleHandler : MonoBehaviour
                                 }
                             }
                             (attackCard, defendCard) = CalculateAttack(column, columnState, new GameObject[4] { enemyBackCard, enemyFrontCard, playerFrontCard, playerBackCard }); // Calculate attack again
-                            column++;
                             GenerateDeck(); // Re-generate the deck
                             waitingState = 1;
                             #endregion
@@ -521,7 +691,7 @@ public class MainCardBattleHandler : MonoBehaviour
                             {
                                 if (attackCard.cardData.attack > 0) // If the card has an attack value
                                 {
-                                    waitingState += attackCard.DoAttack(); // Run the attack animation until it finishes, and then increment waitingState
+                                    waitingState = attackCard.DoAttack(2); // Run the attack animation until it finishes, and then increment waitingState
                                 }
                                 else // Otherwise
                                 {
@@ -538,7 +708,7 @@ public class MainCardBattleHandler : MonoBehaviour
                             {
                                 if (defendCard.cardData.attack > 0) // If the defending card has an attack value
                                 {
-                                    waitingState += defendCard.DoAttack(); // Run the attack animation until it finishes, and then increment waitingState
+                                    waitingState = defendCard.DoAttack(3); // Run the attack animation until it finishes, and then increment waitingState
                                 }
                                 else // Otherwise
                                 {
@@ -551,22 +721,206 @@ public class MainCardBattleHandler : MonoBehaviour
                             if (enemy.health <= 0) // If the enemy runs out of health
                             { // Player wins
                                 currentTurn = "PlayerWin"; // Switch turn to playerWin
+                                bumpStateBy = 2;
                             }
                             else if (health <= 0) // If the player health runs out of health
                             { // Enemy wins
                                 currentTurn = "EnemyWin"; // Switch turn to enemyTurn
+                                bumpStateBy = 1;
                             }
-                            waitingState = 0; // Move back to the first state
+                            else
+                            {
+                                waitingState = 0; // Move back to the first state
+                                if (column >= 3)
+                                {
+                                    currentTurn = "Enemy"; // Set turn to enemy
+                                    column = 0;
+                                }
+                                else
+                                {
+                                    column++;
+                                }
+                            }
                             break;
                     }
+                    #endregion
                     break;
                 case "playerwin":
-                    // Show player winning screen
-                    currentTurn = "EndGame";
+                    #region Show player winning screen
+                    if (gameEndFirstLoop)
+                    {
+                        #region Calculate Xp gain
+                        float multiplier = -1;
+                        switch (enemy.type)
+                        {
+                            default: // basic enemy
+                                multiplier = 1;
+                                break;
+                            case "boss":
+                                multiplier = 2;
+                                break;
+                        }
+                        int xpGain = Convert.ToInt32((levelXp / 10) * multiplier + 1);
+                        #endregion
+                        (int, string, string)[] rewards = new (int, string, string)[enemy.rewards.Length + 1];
+                        rewards[0] = (xpGain, "XP", "XP");
+                        for (int i = 0; i < enemy.rewards.Length; i++)
+                        {
+                            rewards[i + 1] = enemy.rewards[i];
+                        }
+                        xp += xpGain; // Handle leveling up here
+                        #region Handle showing the prompt
+                        gameEndPrompt.SetActive(true);
+                        gameEndFirstLoop = false;
+                        gameEndPromptScript.SetWinText(true);
+                        gameEndPromptScript.SetRewards(rewards);
+                        gameEndPromptScript.SetXpBar(xp, levelXp);
+                        continueClicked = false;
+                        #endregion
+                        #region Update player profile
+                        if (profileHandler != null && PersistentVariables.profileName != "")
+                        {
+                            ProfileData saveGame = profileHandler.FetchProfileData(PersistentVariables.profileName);
+                            saveGame.level = level;
+                            for (int i = 0; i < saveGame.locationStates.Length; i++)
+                            {
+                                if (saveGame.locationStates[i].name == saveGame.location)
+                                {
+                                    saveGame.locationStates[i].state += bumpStateBy;
+                                }
+                            }
+                            foreach ((int, string, string) reward in rewards)
+                            {
+                                switch (reward.Item3.ToLower())
+                                {
+                                    default:
+                                        Debug.LogWarning("Reward not recognised! (Amount: " + reward.Item1 +", Name: " + reward.Item2 + ", Type: " + reward.Item3 + ")");
+                                        break;
+                                    case "card":
+                                        string[] temp = saveGame.deck;
+                                        saveGame.deck = new string[temp.Length + reward.Item1];
+                                        for (int i = 0; i < saveGame.deck.Length; i++)
+                                        {
+                                            if (i < temp.Length)
+                                            {
+                                                saveGame.deck[i] = temp[i];
+                                            }
+                                            else
+                                            {
+                                                saveGame.deck[i] = reward.Item2;
+                                            }
+                                        }
+                                        break;
+                                    case "currency":
+                                        saveGame.currency += reward.Item1;
+                                        break;
+                                    case "xp":
+                                        saveGame.xp += reward.Item1;
+                                        break;
+                                }
+                            }
+                            profileHandler.SaveGame(saveGame);
+                            profileHandler.SetupPersistentVariables(saveGame, profileHandler.FetchOptions(), profileHandler.FetchDocumentsPath());
+                        }
+                        else
+                        {
+                            Debug.LogWarning("Missing reference to profileHandler.cs! Skipping updating profile.");
+                        }
+                        #endregion
+                    }
+                    if (continueClicked)
+                    {
+                        gameEndPrompt.SetActive(false);
+                        currentTurn = "EndGame";
+                        gameEndFirstLoop = true;
+                    }
+                    #endregion
                     break;
                 case "enemywin":
-                    // Show enemy winning screen
-                    currentTurn = "EndGame";
+                    #region Show enemy winning screen
+                    if (gameEndFirstLoop)
+                    {
+                        #region Calculate Xp gain
+                        float multiplier = -1;
+                        switch (enemy.type)
+                        {
+                            default: // basic enemy
+                                multiplier = 1;
+                                break;
+                            case "boss":
+                                multiplier = 2;
+                                break;
+                        }
+                        #endregion
+                        int xpGain = Convert.ToInt32((levelXp / 10) * multiplier + 1);
+                        xp += xpGain;
+                        (int, string, string)[] rewards = new (int, string, string)[1] { (xpGain, "XP", "XP") };
+                        #region Handle showing the prompt
+                        gameEndPrompt.SetActive(true);
+                        gameEndFirstLoop = false;
+                        gameEndPromptScript.SetWinText(false);
+                        gameEndPromptScript.SetRewards(rewards);
+                        gameEndPromptScript.SetXpBar(xp, levelXp);
+                        continueClicked = false;
+                        #endregion
+                        #region Update player profile
+                        if (profileHandler != null && PersistentVariables.profileName != "")
+                        {
+                            ProfileData saveGame = profileHandler.FetchProfileData(PersistentVariables.profileName);
+                            saveGame.level = level;
+                            for (int i = 0; i < saveGame.locationStates.Length; i++)
+                            {
+                                if (saveGame.locationStates[i].name == saveGame.location)
+                                {
+                                    saveGame.locationStates[i].state += bumpStateBy;
+                                }
+                            }
+                            foreach ((int, string, string) reward in rewards)
+                            {
+                                switch (reward.Item3.ToLower())
+                                {
+                                    default:
+                                        Debug.Log("Reward not recognised!");
+                                        break;
+                                    case "card":
+                                        string[] temp = saveGame.deck;
+                                        saveGame.deck = new string[temp.Length + reward.Item1];
+                                        for (int i = 0; i < saveGame.deck.Length; i++)
+                                        {
+                                            if (i < temp.Length)
+                                            {
+                                                saveGame.deck[i] = temp[i];
+                                            }
+                                            else
+                                            {
+                                                saveGame.deck[i] = reward.Item2;
+                                            }
+                                        }
+                                        break;
+                                    case "currency":
+                                        saveGame.currency += reward.Item1;
+                                        break;
+                                    case "xp":
+                                        saveGame.xp += reward.Item1;
+                                        break;
+                                }
+                            }
+                            profileHandler.SaveGame(saveGame);
+                            profileHandler.SetupPersistentVariables(saveGame, profileHandler.FetchOptions(), profileHandler.FetchDocumentsPath());
+                        }
+                        else
+                        {
+                            Debug.LogWarning("Missing reference to profileHandler.cs! Skipping updating profile.");
+                        }
+                        #endregion
+                    }
+                    if (continueClicked)
+                    {
+                        gameEndPrompt.SetActive(false);
+                        currentTurn = "EndGame";
+                        gameEndFirstLoop = true;
+                    }
+                    #endregion
                     break;
                 case "endgame":
                     inCardBattle = false; // Set inCardBattle to false
@@ -581,61 +935,70 @@ public class MainCardBattleHandler : MonoBehaviour
                         {
                             if (location.name == profile.location) // If the location name matches the profile location
                             {
-                                location.state++; // Bump locationState by 1
+                                location.state += bumpStateBy; // Bump locationState by 1
                             }
                         }
                     }
                     catch // If the above code fails to run
                     {
-                        Debug.Log("Unable to bump scene state!"); // Inform the Unity console that something went wrong
+                        Debug.LogWarning("Unable to bump scene state!"); // Inform the Unity console that something went wrong
                     }
                     Vector3 position = board.transform.position;
                     Quaternion rotation = board.transform.rotation; // Store the position data for the board
                     Vector3 scale = board.transform.localScale;
                     GameObject.Destroy(board); // Destroy the board
-                    board = Instantiate(boardPrefab, position, rotation); // Create a new instance of the board
+                    board = Instantiate(boardPrefab, position, rotation); // Create a new instance of the board <- this needs changing
                     board.transform.localScale = scale;
                     try // Try to run the below code
                     {
-                        // Fetch bell and phisch script from new board object
-                    }
-                    catch // If the below code cannot run
-                    {
-                        Debug.Log("Unable to fetch required objects from board!"); // Inform the Unity console that something went wrong
-                    }
-                    try // Try to run the below code
-                    {
-                        sceneStateLoader.locationState++;
+                        sceneStateLoader.locationState += bumpStateBy;
                         sceneStateLoader.Run(); // Load the new scene state
                     }
                     catch // If the above code fails to run
                     {
-                        Debug.Log("Unable to continue since sceneStateLoader does not exist!"); // Inform the Unity console that something went wrong
+                        Debug.LogWarning("Unable to continue since sceneStateLoader does not exist!"); // Inform the Unity console that something went wrong
                     }
                     currentTurn = "Setup"; // Set the currentTurn to setup
                     break;
             }
-            Vector2 screenSize = new Vector2(Camera.main.scaledPixelWidth, Camera.main.scaledPixelHeight);
-            float mousePositionScaleX = Screen.currentResolution.width / screenSize.x; // Fetch data about the screen and scale it to values that are actually useful
-            float mousePositionScaleY = mousePositionScaleX;
-            if (Input.mousePosition.x >= 0 && Input.mousePosition.y >= 0 && Input.mousePosition.x <= screenSize.x && Input.mousePosition.y <= screenSize.y) // check if mouse is actually in game window
+            if (currentTurn.ToLower() == "player" || currentTurn.ToLower() == "enemy" || currentTurn.ToLower() == "computeturn")
             {
-                RaycastHit hitCard; // Create a new raycasthit object
-                Ray cardRay = mainCameraCam.ScreenPointToRay(Input.mousePosition); // Create a new raycast
-                if (Physics.Raycast(cardRay, out hitCard))
+                if (Input.mousePosition.x >= 0 && Input.mousePosition.y >= 0 && Input.mousePosition.x <= Screen.width && Input.mousePosition.y <= Screen.height) // check if mouse is actually in game window
                 {
-                    ShowCardInfo(hitCard, screenSize, mousePositionScaleX, mousePositionScaleY); // figure out why this doesn't work properly
-                }
-                else
-                {
-                    HideCardInfo();
+                    RaycastHit hitCard; // Create a new raycasthit object
+                    Ray cardRay = mainCameraCam.ScreenPointToRay(Input.mousePosition); // Create a new raycast
+                    if (Physics.Raycast(cardRay, out hitCard))
+                    {
+                        ShowCardInfo(hitCard); // figure out why this doesn't work properly
+                    }
+                    else
+                    {
+                        HideCardInfo();
+                    }
                 }
             }
         }
     }
-    private void ShowCardInfo(RaycastHit card, Vector2 screenSize, float mousePositionScaleX, float mousePositionScaleY) // !Function still not finished
+    public void ContinueClicked()
     {
-        if ((card.transform.tag.ToLower() == "enemyboardspace" || card.transform.tag.ToLower() == "playerboardspace"))
+        continueClicked = true;
+    }
+    private GameObject CreatePrompt(string name, Sprite image, Vector2 size, Vector2 position, Transform parent)
+    {
+        GameObject output = new GameObject();
+        output.AddComponent<CanvasRenderer>();
+        Image outputImage = output.AddComponent<Image>();
+        output.transform.SetParent(parent); // This block of code simply creates a new canvas sprite and parents it to the given canvas, it then returns that sprite
+        outputImage.rectTransform.sizeDelta = size;
+        outputImage.sprite = image;
+        output.name = name;
+        output.transform.localPosition = position;
+        output.transform.localScale = new Vector3(1, 1, 1);
+        return output;
+    }
+    private void ShowCardInfo(RaycastHit card) // !Function still not finished
+    {
+        if (card.transform.tag.ToLower() == "enemyboardspace" || card.transform.tag.ToLower() == "playerboardspace")
         {
             try
             {
@@ -644,104 +1007,103 @@ public class MainCardBattleHandler : MonoBehaviour
                 if (cardScript.cardData.state == 2)
                 {
                     // If the mouse is hovering over any card
-                    Vector3 promptPosition = new Vector3();
+                    Vector2 promptPosition = ConvertMouseToCanvasUnits(HUD);
                     switch (showingPrompt) // this code needs fixing, for some reason mouse position is not relative to game window
                     {
                         case true:
-                            if (Input.mousePosition.x > (screenSize.x / 2))// mouse is on right side of screen
+                            
+                            if (Input.mousePosition.x > (Screen.width / 2))// mouse is on right side of screen
                             {
-                                if (Input.mousePosition.y > (screenSize.y / 2)) // mouse is at top of screen
+                                if (Input.mousePosition.y > (Screen.height / 2)) // mouse is at top of screen
                                 {
-                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) - (createdPromptSize.x / 2) - 1;
-                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) - (createdPromptSize.y / 2) - 1;
+                                    promptPosition = new Vector2(promptPosition.x - (createdPromptSize.rect.width / 2) - 1, promptPosition.y - (createdPromptSize.rect.height / 2) - 1);
                                 }
                                 else // mouse is at bottom of screen
                                 {
-                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) - (createdPromptSize.x / 2) - 1;
-                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) + (createdPromptSize.y / 2) + 1;
+                                    promptPosition = new Vector2(promptPosition.x - (createdPromptSize.rect.width / 2) - 1, promptPosition.y + (createdPromptSize.rect.height / 2) + 1);
                                 }
                             }
                             else // mouse is on left side of screen
                             {
-                                if (Input.mousePosition.y > (screenSize.y / 2)) // mouse is at top of screen
+                                if (Input.mousePosition.y > (Screen.height / 2)) // mouse is at top of screen
                                 {
-                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) + (createdPromptSize.x / 2) + 1;
-                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) - (createdPromptSize.y / 2) - 1;
+                                    promptPosition = new Vector2(promptPosition.x + (createdPromptSize.rect.width / 2) + 1, promptPosition.y - (createdPromptSize.rect.height / 2) - 1);
                                 }
                                 else // mouse is at bottom of screen
                                 {
-                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) + (createdPromptSize.x / 2) + 1;
-                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) + (createdPromptSize.y / 2) + 1;
+                                    promptPosition = new Vector2(promptPosition.x + (createdPromptSize.rect.width / 2) + 1, promptPosition.y + (createdPromptSize.rect.height / 2) + 1);
                                 }
                             }
-                            promptPosition.x -= Screen.currentResolution.width / 2;
-                            promptPosition.y -= Screen.currentResolution.height / 2;
-                            promptPosition.z = 0;
-                            createdPrompt.transform.localPosition = promptPosition;
-                            createdPrompt.transform.localScale = new Vector3(1, 1, 1);
+                            
+                            createdPrompt.transform.localPosition = promptPosition; // Set the prompt position
+                            createdPrompt.transform.localScale = new Vector3(1, 1, 1); // Reset the scale since Unity sometimes does wacky stuff with scale for unknown reasons
                             break;
                         case false:
-                            showingPrompt = true;
-                            createdPrompt = Instantiate(cardInfoPrefab, new Vector3(0, 0, 0), Quaternion.Euler(new Vector3(0, 0, 0)));
-                            createdPromptSize = createdPrompt.GetComponent<RectTransform>().sizeDelta;
-                            createdPrompt.transform.SetParent(cardBattleHUD.transform);
-                            createdPrompt.transform.localScale = new Vector3(1, 1, 1);
+                            showingPrompt = true; // Set showingprompt to true
+                            createdPrompt = Instantiate(cardInfoPrefab, new Vector3(0, 0, 0), Quaternion.Euler(new Vector3(0, 0, 0))); // Create a new prompt
+                            createdPromptSize = createdPrompt.GetComponent<RectTransform>();
+                            createdPrompt.transform.SetParent(cardBattleHUD.transform); // Parent the prompt accordingly
+                            createdPrompt.transform.localScale = new Vector3(1, 1, 1); // V Load card details into prompt V
                             createdPrompt.transform.Find("CardTitleDetails").Find("CardName").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.name.ToString();
-                            createdPrompt.transform.Find("CardTitleDetails").Find("Health").Find("HealthText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.health.ToString();
+                            createdPrompt.transform.Find("CardTitleDetails").Find("Health").Find("HealthText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.health.ToString() + "/" + cardScript.cardData.maxHealth.ToString();
                             createdPrompt.transform.Find("CardTitleDetails").Find("Attack").Find("AttackText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.attack.ToString();
-                            createdPrompt.transform.Find("CardTitleDetails").Find("Cost").Find("CostText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.cost.ToString();
+                            createdPrompt.transform.Find("CardTitleDetails").Find("Cost").Find("CostText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.cost.ToString() + "/" + cardScript.cardData.maxCost.ToString();
                             createdPrompt.transform.Find("CardAbilityDescription").Find("AbilityText").GetComponent<TextMeshProUGUI>().text = cardScript.cardData.description.ToString();
                             bool found = false;
-                            foreach (Sprite portrait in cardPortraits)
+                            foreach (Sprite portrait in cardPortraits) // Loop through every portrait sprite
                             {
-                                if (portrait.name == cardScript.cardData.name)
+                                if (portrait.name == cardScript.cardData.name) // If the name of the card matches the portrait name
                                 {
-                                    createdPrompt.transform.Find("CardSprite").GetComponent<Image>().sprite = portrait;
-                                    found = true;
+                                    createdPrompt.transform.Find("CardSprite").GetComponent<Image>().sprite = portrait; // Set the card prompt portrait to the found portrait
+                                    found = true; // Set found to true
                                 }
                             }
-                            if (!found)
+                            if (!found) // If a portrait was not found
                             {
-                                createdPrompt.transform.Find("CardSprite").GetComponent<Image>().sprite = defaultCardPortrait;
+                                createdPrompt.transform.Find("CardSprite").GetComponent<Image>().sprite = defaultCardPortrait; // Use a default portrait
                             }
-                            if (Input.mousePosition.x > (screenSize.x / 2))// mouse is on right side of screen
+                            
+                            if (Input.mousePosition.x > (Screen.width / 2))// mouse is on right side of screen
                             {
-                                if (Input.mousePosition.y > (screenSize.y / 2)) // mouse is at top of screen
+                                if (Input.mousePosition.y > (Screen.height / 2)) // mouse is at top of screen
                                 {
-                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) - (createdPromptSize.x / 2) - 1;
-                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) - (createdPromptSize.y / 2) - 1;
+                                    promptPosition = new Vector2(promptPosition.x - (createdPromptSize.rect.width / 2) - 1, promptPosition.y - (createdPromptSize.rect.height / 2) - 1);
                                 }
                                 else // mouse is at bottom of screen
                                 {
-                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) - (createdPromptSize.x / 2) - 1;
-                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) + (createdPromptSize.y / 2) + 1;
+                                    promptPosition = new Vector2(promptPosition.x - (createdPromptSize.rect.width / 2) - 1, promptPosition.y + (createdPromptSize.rect.height / 2) + 1);
                                 }
                             }
                             else // mouse is on left side of screen
                             {
-                                if (Input.mousePosition.y > (screenSize.y / 2)) // mouse is at top of screen
+                                if (Input.mousePosition.y > (Screen.height / 2)) // mouse is at top of screen
                                 {
-                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) + (createdPromptSize.x / 2) + 1;
-                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) - (createdPromptSize.y / 2) - 1;
+                                    promptPosition = new Vector2(promptPosition.x + (createdPromptSize.rect.width / 2) + 1, promptPosition.y - (createdPromptSize.rect.height / 2) - 1);
                                 }
                                 else // mouse is at bottom of screen
                                 {
-                                    promptPosition.x = (Input.mousePosition.x * mousePositionScaleX) + (createdPromptSize.x / 2) + 1;
-                                    promptPosition.y = (Input.mousePosition.y * mousePositionScaleY) + (createdPromptSize.y / 2) + 1;
+                                    promptPosition = new Vector2(promptPosition.x + (createdPromptSize.rect.width / 2) + 1, promptPosition.y + (createdPromptSize.rect.height / 2) + 1);
                                 }
                             }
-                            promptPosition.z = 0;
-                            createdPrompt.transform.localPosition = promptPosition;
-                            createdPrompt.transform.localScale = new Vector3(1, 1, 1);
+                            
+                            createdPrompt.transform.localPosition = promptPosition; // Set prompt to correct position
+                            createdPrompt.transform.localScale = new Vector3(1, 1, 1); // Re-scale prompt to prevent Unity shenanigans
                             break;
                     }
                 }
             }
-            catch
+            catch // If the above code fails to run
             {
-                Debug.Log("Unable to find card!");
+                Debug.LogWarning("Unable to find card!"); // Inform the Unity console that something went wrong
             }
         }
+    }
+    private Vector2 ConvertMouseToCanvasUnits(RectTransform canvas)
+    {
+        Vector2 offset = new Vector2(canvas.rect.width / 2, canvas.rect.height / 2); // Calculate (in canvas units) the offset from the mouse origin to the canvas origin
+        Vector2 mouseToCanvasScale = new Vector2(canvas.rect.width / Screen.width, canvas.rect.height / Screen.height); // Calculate a ratio between the canvas size and screen size
+        Vector2 output = new Vector2(Input.mousePosition.x * mouseToCanvasScale.x - offset.x, Input.mousePosition.y * mouseToCanvasScale.y - offset.y); // Combine mouse position, scale and offset to calculate mouse position relative to canvas
+        return output; // Return calculated position
     }
     private void HideCardInfo() // Function for removing card info prompt
     {
@@ -752,7 +1114,7 @@ public class MainCardBattleHandler : MonoBehaviour
                 GameObject.Destroy(createdPrompt); // Destroy the prompt
                 showingPrompt = false; // Set all relevant variables to default values
                 createdPrompt = null;
-                createdPromptSize = new Vector2();
+                createdPromptSize = new RectTransform();
             }
             catch // If the above code fails to run
             {
@@ -762,7 +1124,6 @@ public class MainCardBattleHandler : MonoBehaviour
     }
     private (Card, Card) DoAttack(Card attackingCard, Card defendingCard) // Function for handling attacks between two cards
     {
-        System.Random random = new System.Random();
         int damageDealt = attackingCard.attack; // Define useful values for later
         bool crit = false;
         switch (attackingCard.ability) // Check which ability the attacking card has
@@ -808,23 +1169,23 @@ public class MainCardBattleHandler : MonoBehaviour
         string state = "";
         CardScript attackingCard = null;
         CardScript defendingCard = null;
-        foreach (int i in columnState)
+        foreach (int i in columnState) // Loop through every value in columnState
         {
-            state += i.ToString();
+            state += i.ToString(); // Convert value to string and add it to state
         }
         CardScript[] columnCards = new CardScript[columnCardsObj.Length];
-        for (int i = 0; i < columnCards.Length; i++)
+        for (int i = 0; i < columnCards.Length; i++) // Loop through all four cards give
         {
-            if (columnCardsObj[i] != null)
+            if (columnCardsObj[i] != null) // If there is a card
             {
-                columnCards[i] = columnCardsObj[i].GetComponent<CardScript>();
+                columnCards[i] = columnCardsObj[i].GetComponent<CardScript>(); // Find and reference the card script component
             }
-            else
+            else // Otherwise
             {
-                columnCards[i] = null;
+                columnCards[i] = null; // Leave the card script as null
             }
         }
-        switch (state)
+        switch (state) // Pick which state the board is in
         {
             default:
                 //Debug.Log("No cards on board at column " + column + " so nothing happened. (" + state + ")");
@@ -955,45 +1316,57 @@ public class MainCardBattleHandler : MonoBehaviour
                 break;
                 
         }
-        for (int j = 0; j < columnCardsObj.Length; j++)
+        for (int j = 0; j < columnCardsObj.Length; j++) // Loop through every card again
         {
-            if (columnCardsObj[j] != null)
+            if (columnCardsObj[j] != null) // If there is a card
             {
                 columnCardsObj[j].transform.Find("Health").GetComponent<TextMeshPro>().text = columnCards[j].cardData.health.ToString();
-                float maxCost = columnCards[j].cardData.maxCost;
+                float maxCost = columnCards[j].cardData.maxCost; // Update all of the card's values
                 float maxHealth = columnCards[j].cardData.maxHealth;
                 float health = columnCards[j].cardData.health;
                 columnCards[j].cardData.cost = Convert.ToInt32((maxCost * (health / maxHealth)));
                 columnCardsObj[j].transform.Find("Cost").GetComponent<TextMeshPro>().text = columnCards[j].cardData.cost.ToString();
-                if (columnCards[j].cardData.health <= 0)
+                if (columnCards[j].cardData.health <= 0) // If the card has run out of health
                 {
-                    GameObject.Destroy(columnCardsObj[j]);
-                    columnCardsObj[j] = null;
+                    if (columnCardsObj[j] == attackCard) // If the card is attacking
+                    {
+                        attackCard = null; // Remove reference to attack card
+                    }
+                    else if (columnCardsObj[j] == defendCard) // If the card is defending
+                    {
+                        defendCard = null; // Remove reference to defend card
+                    }
+                    GameObject.Destroy(columnCardsObj[j]); // Destroy the card that has run out of health
+                    columnCardsObj[j] = null; // Remove reference to the card
                     if (j < 2) // Card is enemy card
                     {
-                        foreach (Card card in enemy.fullDeck.cards)
+                        foreach (Card card in enemy.fullDeck.cards) // Search through enemy full deck
                         {
-                            if (columnCards[j].cardData.ID == card.ID)
+                            if (columnCards[j].cardData.ID == card.ID) // If destroyed card is found
                             {
-                                card.state = 0;
+                                card.state = 0; // Reset card to be in fullDeck
                             }
                         }
+                        playerCurrency += columnCards[j].cardData.maxCost;
+                        UpdateCurrency(playerCurrency, enemy.currency);
                     }
                     else // Card is friendly card
                     {
-                        foreach (Card card in playerFullDeck.cards)
+                        foreach (Card card in playerFullDeck.cards) // Search through player full deck
                         {
-                            if (columnCards[j].cardData.ID == card.ID)
+                            if (columnCards[j].cardData.ID == card.ID) // If destroyed card is found
                             {
-                                card.state = 0;
+                                card.state = 0; // Reset card to be in fullDeck
                             }
                         }
+                        enemy.currency += columnCards[j].cardData.maxCost;
+                        UpdateCurrency(playerCurrency, enemy.currency);
                     }
                 }
             }
         }
-        UpdateHealth();
-        return (attackingCard, defendingCard);
+        UpdateHealth(); // Call the UpdateHealth function
+        return (attackingCard, defendingCard); // Return the attacking and defending cards
     }
     private void GenerateDeck()
     {
@@ -1061,27 +1434,19 @@ public class MainCardBattleHandler : MonoBehaviour
         output.transform.localPosition = position; // Set the card's position to position
         output.transform.localRotation = Quaternion.Euler(new Vector3(0, 0, -10)); // Set the card's rotation to localRotation
         output.transform.localScale = new Vector3(1, 1, 1); // Set the card's scale to 1
-        output.GetComponent<CardScript>().cardData = card; // Find and set the cardData component of the card to card
+        CardScript outputScript = output.GetComponent<CardScript>(); // Find and set the cardData component of the card to card
+        outputScript.cardData = card;
+        outputScript.board = board.transform;
         MeshRenderer outputMesh = output.GetComponent<MeshRenderer>(); // Cache the meshrenderer of the card
         #endregion
         #region Swap card material for required material
-        switch (card.materialName.ToLower()) // Choose which material needs to be loaded
+        outputMesh.material = defaultCardMaterial;
+        foreach (Material material in cardMaterials)
         {
-            default: // If no cases match the input
-                Debug.Log("Card material '" + card.materialName + "' not recognised!"); // Inform the Unity console that the material does not exist
-                break;
-            case "reaper": // If the material is reaper
-                outputMesh.material = cardMaterials[0]; // Set the material to material0
-                break;
-            case "phisch": // If the material is phisch
-                outputMesh.material = cardMaterials[1]; // Set the material to material1
-                break;
-            case "dusk":
-                outputMesh.material = cardMaterials[2];
-                break;
-            case "rock":
-                outputMesh.material = cardMaterials[3];
-                break;
+            if (material.name == card.materialName)
+            {
+                outputMesh.material = material;
+            }
         }
         #endregion
         #region Load card details
@@ -1179,7 +1544,7 @@ public class MainCardBattleHandler : MonoBehaviour
         int l = 0; // Create l and set it to 0
         foreach (Card card in fullDeck.cards) // Loop through every card in fullDeck
         {
-            if (card.state != 1 || card.state != 2) // If the card is not in the player's hand or on the board
+            if (card.state == 0) // If the card is not in the player's hand or on the board
             {
                 l++; // Add 1 to l
             }
@@ -1194,7 +1559,7 @@ public class MainCardBattleHandler : MonoBehaviour
         }
         #endregion
         #region If there are more sparce cards in fullDeck than spare spaces in deck
-        if (l >= m) // if the number of free cards in fullDeck is more than the number of free cards in deck
+        if (l > m) // if the number of free cards in fullDeck is more than or equal to the number of free cards in deck
         {
             System.Random random = new System.Random(); // Create a new random
             List<int> usedIndexes = new List<int>(); // Create a list of used indexes
@@ -1203,11 +1568,27 @@ public class MainCardBattleHandler : MonoBehaviour
                 if (currentDeck.cards[i] == null) // If there is a card missing
                 {
                     // add a card
-                    int index = random.Next(fullDeck.cards.Length); // Randomize a new index
-                    while (usedIndexes.Contains(index) || (fullDeck.cards[index].state == 1 || fullDeck.cards[index].state == 2)) // Loop until a unique index is found
+                    //int index = random.Next(fullDeck.cards.Length); // Randomize a new index
+                    //while (usedIndexes.Contains(index) || (fullDeck.cards[index].state == 1 || fullDeck.cards[index].state == 2)) // Loop until a unique index is found
+                    //{
+                    //    index = random.Next(fullDeck.cards.Length); // Randomize a new index
+                    //}
+                    List<int> freeIndexes = new List<int>();
+                    for (int n = 0; n < fullDeck.cards.Length; n++)
                     {
-                        index = random.Next(fullDeck.cards.Length); // Randomize a new index
+                        if (fullDeck.cards[n] != null)
+                        {
+                            if (fullDeck.cards[n].state == 0 && !usedIndexes.Contains(n))
+                            {
+                                freeIndexes.Add(n);
+                            }
+                        }
+                        else
+                        {
+                            Debug.Log("Null card in fullDeck, this should not happen!");
+                        }
                     }
+                    int index = freeIndexes[random.Next(0, freeIndexes.Count)];
                     currentDeck.cards[i] = fullDeck.cards[index]; // Add the selected card to currentDeck
                     fullDeck.cards[index].state = 1;
                     usedIndexes.Add(index); // Add the index to usedIndexes
@@ -1218,25 +1599,50 @@ public class MainCardBattleHandler : MonoBehaviour
         #region If there are more spare spaces in deck than spare cards in fullDeck
         else // If the current deck is larger than l
         {
-            Debug.Log("Cannot fully populate deck when fullDeck is less than the currentDeck!"); // Inform the Unity console that something has gone very wrong
-            int i = 0;
-            Card[] temp = new Card[fullDeck.cards.Length + currentDeck.cards.Length]; // Code below here simply fills in currentDeck with every card that is left in fullDeck
-            for (int k = 0; k < currentDeck.cards.Length; k++)
+            if (l > 0)
             {
-                if (currentDeck.cards[k] != null)
+                Debug.Log("Cannot fully populate deck when fullDeck is less than the currentDeck!"); // Inform the Unity console that something has gone very wrong
+                int i = 0;
+                Card[] temp = new Card[currentDeck.cards.Length - m + l]; // Code below here simply fills in currentDeck with every card that is left in fullDeck
+                for (int k = 0; k < currentDeck.cards.Length; k++)
                 {
-                    temp[k] = currentDeck.cards[k];
-                    i = k;
+                    if (currentDeck.cards[k] != null)
+                    {
+                        temp[k] = currentDeck.cards[k];
+                        i = k;
+                    }
                 }
+                for (int j = 0; j < fullDeck.cards.Length; j++)
+                {
+                    if (fullDeck.cards[j].state == 0)
+                    {
+                        i++;
+                        temp[i] = fullDeck.cards[j];
+                        fullDeck.cards[j].state = 1;
+                    }
+                }
+                currentDeck.cards = temp;
             }
-            for (int j = 0; j < fullDeck.cards.Length; j++)
+            else
             {
-                if (fullDeck.cards[j].state != 1 || fullDeck.cards[j].state != 2)
+                Debug.Log("There are no free cards in fullDeck");
+                int i = 0;
+                foreach (Card card in currentDeck.cards)
                 {
-                    i++;
-                    temp[i] = fullDeck.cards[j];
-                    fullDeck.cards[j].state = 1;
+                    if (card != null)
+                    {
+                        i++;
+                    }
                 }
+                Card[] temp = new Card[i];
+                for (int j = 0; j < currentDeck.cards.Length; j++)
+                {
+                    if (currentDeck.cards[j] != null)
+                    {
+                        temp[j] = currentDeck.cards[j];
+                    }
+                }
+                currentDeck.cards = temp;
             }
         }
         #endregion

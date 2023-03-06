@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class CardScript : MonoBehaviour
 {
+    [HideInInspector]
+    public Transform board;
     private GameObject mainCamera;
     [HideInInspector]
     public bool mouseIsOver = false; // Used by other scripts to check if mouse is over a card without doing raycasts in that script
@@ -31,7 +33,7 @@ public class CardScript : MonoBehaviour
     private GameObject nada = null;
     private bool showing = false;
 
-    private GameObject slapSprite; // Variables for handlign the slap sprite
+    private GameObject slapSprite; // Variables for handling the slap sprite
 
     private void Update()
     {
@@ -70,7 +72,7 @@ public class CardScript : MonoBehaviour
         ogPos = this.transform.position;
         newPos = ogPos + direction; // Define other vectors for places the card can move to
         ogRot = this.transform.rotation;
-        newRot = Quaternion.Euler(new Vector3(0, 0, 0));
+        newRot = board.rotation;
         zeroRot = new Quaternion();
         boxCollider = this.GetComponent<BoxCollider>(); // Store reference to box collider
         slapSprite = this.transform.Find("SlapSprite").gameObject;
@@ -133,21 +135,21 @@ public class CardScript : MonoBehaviour
     {
         this.transform.Find("Attack").GetComponent<TextMeshPro>().text = cardScript.cardData.attack.ToString(); // Find the attack text object and set it equal to the card's attack
     }
-    public int DoAttack() // Function for handling attack animation
+    public int DoAttack(int output) // Function for handling attack animation
     {
         switch (attackState) // Pick which step the animation is currently in
         {
             default: // If the step is not recognised
                 Debug.Log("AttackState " + attackState + " on card " + this.cardData.name + " not recognised. Skipping to -1."); // Inform the Unity console that something went wrong
                 attackState = -1; // Set attackState to -1
-                return 0; // Implies script is not done
+                return output - 1; // Implies script is not done
             case -1: // If animation has just ended
                 attackState = 0;
                 animTimer = 0; // Reset variables to their default values
                 this.transform.localPosition = animOgPos; // Move the card back to its original position
                 animOgPos = new Vector3();
                 animLastPos = new Vector3();
-                return 1; // Implies script is done
+                return output; // Implies script is done
             case 0: // First step of the animation, lifts card up
                 animTimer += Time.deltaTime; // Add the current deltaTime to the timer
                 if (animTimer == Time.deltaTime || animTimer == 0) // If this is the first frame
@@ -162,7 +164,7 @@ public class CardScript : MonoBehaviour
                     animLastPos = this.transform.localPosition; // Store this position as animLastPos
                 }
                 this.transform.localPosition = Vector3.Lerp(animOgPos, animOgPos + new Vector3(0, 0.04f, -0.03f), animTimer / 0.2f); // Interpolate the card between ogPos and the new pog over 0.2s
-                return 0; // Implies script is not done
+                return output - 1; // Implies script is not done
             case 1: // Second step of the animation, throws card forward
                 animTimer += Time.deltaTime; // Add deltaTime to the timer
                 if (animTimer >= 0.1f) // If 0.1 seconds have passed
@@ -173,7 +175,7 @@ public class CardScript : MonoBehaviour
                     animLastPos = this.transform.localPosition; // Store this position as animLastPof
                 }
                 this.transform.localPosition = Vector3.Lerp(animLastPos, animLastPos + new Vector3(0, -0.1f, 0), animTimer / 0.1f); // Interpolate the card between its last position and a new position over 0.1s
-                return 0; // Implies script is not done
+                return output - 1; // Implies script is not done
             case 2: // Third step of the animation, returns card to og position
                 animTimer += Time.deltaTime; // Add deltaTime to timer
                 if (animTimer >= 0.3f) // If 0.3 seconds have passed
@@ -183,7 +185,7 @@ public class CardScript : MonoBehaviour
                     this.transform.localPosition = animOgPos; // Move the card to its original position
                 }
                 this.transform.localPosition = Vector3.Lerp(animLastPos, animOgPos, animTimer / 0.3f); // Interpolate the card between its last position and its original position
-                return 0;  // Implies script is not done
+                return output - 1;  // Implies script is not done
         }
     }
     public void ShowNada() // Function for spawing and raising NADA, then destroying it after set amount of time

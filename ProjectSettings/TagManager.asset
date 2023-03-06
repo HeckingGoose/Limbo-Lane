@@ -9,6 +9,7 @@ TagManager:
   - EndTurnObject
   - PhischPile
   - Card
+  - PlayerCardPile
   layers:
   - Default
   - TransparentFX

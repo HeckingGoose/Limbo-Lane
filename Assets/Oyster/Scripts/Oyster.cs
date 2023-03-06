@@ -298,6 +298,7 @@ public class Oyster : MonoBehaviour
             int i = 0;
             float currentWaitTime = 0;
             while (i < maxLinesPerFrame && maxTimeUntilNextFrame > currentWaitTime)
+            //for (i = 0; i < 5; i++)
             {
                 i++;
                 currentWaitTime += Time.deltaTime;
@@ -440,9 +441,9 @@ public class Oyster : MonoBehaviour
                     }
                     failedReadAttempts = 0; // Resets the total failures of this try statement to 0
                 }
-                catch // If the above try statement fails at any point
+                catch (Exception e) // If the above try statement fails at any point
                 {
-                    Debug.Log("Failed to load and run line. Ending conversation in " + (10 - (int)failedReadAttempts).ToString() + " seconds."); // Inform the user that the script failed to read and run a line, and then calculate how many seconds are left of attempts until the script auto-quits
+                    Debug.LogWarning("Failed to load and run line (" + e.Message + "). Ending conversation in " + (10 - (int)failedReadAttempts).ToString() + " seconds."); // Inform the user that the script failed to read and run a line, and then calculate how many seconds are left of attempts until the script auto-quits
                     if (!lineAlreadyProcessed) // The below code decrements the timer when the script will exit, this occurs in this if statement as it is time sensitive
                     {
                         failedReadAttempts += Time.deltaTime;
@@ -451,7 +452,7 @@ public class Oyster : MonoBehaviour
                     if (failedReadAttempts > 10f) // If 10 seconds has passed, the script auto quits - if a drive somehow takes 10 seconds to load a JSON file, then I will be impressed
                     {
                         inConversation = false; // Tell the script that it is no longer in a conversation
-                        CleanupSpeech(); // Calls the cleanup method to unload any currently loaded addressables and remove any objects created by the script
+                        CleanupSpeech(true); // Calls the cleanup method to unload any currently loaded addressables and remove any objects created by the script
                     }
                 }
             }
@@ -558,6 +559,7 @@ public class Oyster : MonoBehaviour
                     Debug.Log("Conversation " + currentConversation.title + " loaded without any errors."); // Tell the Unity console to output that the conversation loaded with no errors
                 }
                 Addressables.Release(handle); // Removes the asset Character#-Conversations.json from memory
+                CleanupSpeech(false);
                 Speak(characterIndex, conversationName, currentLine); // Calls the speak method again, so that the method now continues since the required data has been loaded
             }
         }
@@ -625,7 +627,7 @@ public class Oyster : MonoBehaviour
             }
             catch // If the above code fails to run
             {
-                Debug.Log("Sprite width and height could not be loaded! Continuing with (100,100)..."); // Inform the Unity console that the above code couldn't be run, and then continue with the previously set default values
+                Debug.LogWarning("Sprite width and height could not be loaded! Continuing with (100,100)..."); // Inform the Unity console that the above code couldn't be run, and then continue with the previously set default values
             }
             //Define optional parameter default values
             bool spriteIsCool = false; // Testing variable that I will likely keep in just for testing purposes
@@ -1956,7 +1958,9 @@ public class Oyster : MonoBehaviour
         // Required Parameters:
         // Optional Parameters:
         // param: bumpSceneState = boolean
+        // param: bumpAmoun = integer
         bool bumpSceneState = true;
+        int bumpAmount = 1;
         if (parameters.Length > 0)
         {
             foreach (string parameter in parameters)
@@ -1977,9 +1981,22 @@ public class Oyster : MonoBehaviour
                             Debug.Log("Unable to convert '" + currentParameter[1] + "' to boolean.");
                         }
                         break;
+                    case "bumpAmount":
+                        try
+                        {
+                            bumpAmount = Convert.ToInt32(currentParameter[1]);
+                        }
+                        catch
+                        {
+                            Debug.Log("Unable to convert '" + currentParameter[1] + "' to int.");
+                        }
+                        break;
                 }
             }
         }
+        currentLine++;
+        inConversation = false; // Tell the script that it is no longer in a conversation
+        CleanupSpeech(true); // Calls the cleanup method to unload any currently loaded addressables and remove any objects created by the script
         if (bumpSceneState)
         {
             try
@@ -1993,7 +2010,7 @@ public class Oyster : MonoBehaviour
                 {
                     if (profileData.locationStates[i].name == PersistentVariables.nextSceneName)
                     {
-                        profileData.locationStates[i].state++;
+                        profileData.locationStates[i].state += bumpAmount;
                     }
                 }
                 File.WriteAllText(PersistentVariables.documentsPath + @"\My Games\LimboLane\Profiles\" + PersistentVariables.profileName + ".json", JsonUtility.ToJson(profileData));
@@ -2002,12 +2019,16 @@ public class Oyster : MonoBehaviour
             {
                 Debug.Log("Unable to update profile with new location!");
             }
+            try
+            {
+                sceneStateLoader.locationState += bumpAmount;
+                sceneStateLoader.Run();
+            }
+            catch
+            {
+                Debug.Log("Unable to bump scene state as scene state loader does not exist!");
+            }
         }
-        sceneStateLoader.locationState++;
-        sceneStateLoader.Run();
-        currentLine++;
-        inConversation = false; // Tell the script that it is no longer in a conversation
-        CleanupSpeech(); // Calls the cleanup method to unload any currently loaded addressables and remove any objects created by the script
     }
     #endregion
     #region ModCamFOV
@@ -2566,7 +2587,7 @@ public class Oyster : MonoBehaviour
         }
         return new Vector4(vectorx, vectory, vectorz, vectorw); // Return a new vector made of vectorx, vectory, vectorz and vectorw
     }
-    private void CleanupSpeech() // Destroys all objects and addressables created by a script
+    private void CleanupSpeech(bool leaving) // Destroys all objects and addressables created by a script
     {
         foreach (KeyValuePair<string, GameObject> entry in createdObjects) // Loops through each entry in gameOBjectsNames
         {
@@ -2592,17 +2613,20 @@ public class Oyster : MonoBehaviour
                 Debug.Log("Failed to release addressable!"); // Inform the Unity console that it failed
             }
         }
-        for (int i = 0; i < modObj_objectsToFix.Count; i++) // Loop through all objects that need moving back to their original positions
+        if (leaving)
         {
-            int c = modObj_objectsToFix.Count - 1 - i; // Calculate an index such that the dictionary is read back to front
-            modObj_objectsToFix[c].gameObject.transform.position = modObj_objectsToFix[c].oldState[0];
-            modObj_objectsToFix[c].gameObject.transform.eulerAngles = modObj_objectsToFix[c].oldState[1]; // Restore the object's transform values back to the values stored in the dictionary
-            modObj_objectsToFix[c].gameObject.transform.localScale = modObj_objectsToFix[c].oldState[2];
-        }
-        for (int i = 0; i < modFOV_camerasToFix.Count; i++)
-        {
-            int c = modFOV_camerasToFix.Count - 1 - i;
-            modFOV_camerasToFix[c].camera.fieldOfView = modFOV_camerasToFix[c].fov;
+            for (int i = 0; i < modObj_objectsToFix.Count; i++) // Loop through all objects that need moving back to their original positions
+            {
+                int c = modObj_objectsToFix.Count - 1 - i; // Calculate an index such that the dictionary is read back to front
+                modObj_objectsToFix[c].gameObject.transform.position = modObj_objectsToFix[c].oldState[0];
+                modObj_objectsToFix[c].gameObject.transform.eulerAngles = modObj_objectsToFix[c].oldState[1]; // Restore the object's transform values back to the values stored in the dictionary
+                modObj_objectsToFix[c].gameObject.transform.localScale = modObj_objectsToFix[c].oldState[2];
+            }
+            for (int i = 0; i < modFOV_camerasToFix.Count; i++)
+            {
+                int c = modFOV_camerasToFix.Count - 1 - i;
+                modFOV_camerasToFix[c].camera.fieldOfView = modFOV_camerasToFix[c].fov;
+            }
         }
         currentLine = 0;
         loadedAddressables = new Dictionary<int, AsyncOperationHandle>();
@@ -2616,6 +2640,10 @@ public class Oyster : MonoBehaviour
         loadedSprites = new Dictionary<string, Sprite>(); // Maybe more than some dictionaries
         conversationStrings = new Dictionary<string, string>();
         lineMarkers = new Dictionary<string, int>();
+        if (leaving)
+        {
+            inConversation = false;
+        }
     }
     #endregion
 }

@@ -4,6 +4,8 @@ public class BellScript : MonoBehaviour
 {
     [HideInInspector]
     public bool bellClicked = false; // True when the bell has been clicked
+    [HideInInspector]
+    public bool mouseOver = false;
     private bool mouseDown = false; // True when the mouse has been clicked
     private void Update() // Code in here is ran every frame
     {
@@ -17,6 +19,10 @@ public class BellScript : MonoBehaviour
             bellClicked = false; // Set bellClicked to false
         }
     }
+    private void OnMouseExit()
+    {
+        mouseOver = false;
+    }
     private void OnMouseOver() // Code in here is ran while the mouse hovers over this object
     {
         if (!mouseDown && Input.GetAxis("PrimaryAction") > 0) // If the mouse is not held and the mouse is clicked
@@ -27,5 +33,6 @@ public class BellScript : MonoBehaviour
         {
             bellClicked = false; // Set bellClicked to false
         }
+        mouseOver = true;
     }
 }

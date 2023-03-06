@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class LauchCardBattleTest : MonoBehaviour
+public class LaunchCardBattleTest : MonoBehaviour
 {
     [SerializeField]
     private MainCardBattleHandler mainCardBattleHandler;

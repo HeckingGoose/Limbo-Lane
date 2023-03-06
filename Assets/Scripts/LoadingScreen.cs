@@ -24,7 +24,7 @@ public class LoadingScreen : MonoBehaviour
         catch // If the above code fails to run
         {
             Debug.Log("Unable to load scene '" + PersistentVariables.nextSceneName + "' as it does not exist. Loading back to main menu"); // Inform Unity that something went wrong
-            PersistentVariables.nextSceneName = "MainMenu"; // Default to loading back to the main menu
+            PersistentVariables.nextSceneName = "AlexHouse"; // Default to loading back to the main menu
             sceneLoader = SceneManager.LoadSceneAsync(PersistentVariables.nextSceneName);
         }
     }

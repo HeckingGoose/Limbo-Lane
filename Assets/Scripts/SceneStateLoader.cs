@@ -11,10 +11,13 @@ public class SceneStateLoader : MonoBehaviour
     private OysterCharacterScript oysterCharacter;
     [SerializeField]
     private MainCardBattleHandler mainCardBattleHandler;
+    [SerializeField]
+    private ProfileHandler profileHandler;
     [HideInInspector]
     public int locationState = 71077345;
     [HideInInspector]
     public bool done = false;
+    private bool sceneJustLoaded = true;
     private void Start()
     {
         if (PersistentVariables.documentsPath == "") // If documents path has not been defined
@@ -44,19 +47,30 @@ public class SceneStateLoader : MonoBehaviour
             Debug.Log("Profile data could not be found!"); // Inform the Unity console that something went wrong
             locationState = 0; // Set locationState to 0
         }
+
         Run(); // Call public run method on scene start
     }
     public void Run() // Method is public so that Oyster can call it on conversation end
     {
-        Debug.Log(locationName + ": " + locationState);
         switch (locationName) // Compare locationName against below cases
         {
             default: // If locationName matches no cases
                 Debug.Log("Location '" + locationName + "' does not exist."); // Inform Unity that the location does not exist
                 break;
             case "AlexHouse": // If the location is 'AlexHouse'
+                if (PersistentVariables.profileName != "")
+                {
+                    profileHandler.LoadGame(PersistentVariables.profileName);
+                }
                 break; // Do nothing
             case "AlyxRoom": // If the location is AlyxRoom
+                //if (sceneJustLoaded)
+                //{
+                //    oysterCharacter.SetConversationName("RemoveScreenCover"); // Set and run the conversation 'AlyxTutorial'
+                //    oysterCaller.CallScript(oysterCharacter);
+                //}
+                //else
+                //{
                 switch (locationState) // Compare locationState against below cases
                 {
                     default: // If locationState matches no cases
@@ -67,16 +81,27 @@ public class SceneStateLoader : MonoBehaviour
                         oysterCaller.CallScript(oysterCharacter);
                         break;
                     case 1: // If the locationState is 1
-                        //oysterCharacter.SetConversationName("AlyxPostTutorialIntro"); // Set and run the conversation 'AlyxPostTutorialIntro'
-                        //oysterCaller.CallScript(oysterCharacter);
-                        mainCardBattleHandler.StartCardBattle();
-                        // Begin a card battle here
-                        //mainCardBattleHandler.StartCardBattle();
+                        Camera.main.transform.position = new Vector3(0, 1.44f, 1.58f);
+                        Camera.main.transform.eulerAngles = new Vector3(63.527f, 180f, 0);
+                        Camera.main.fieldOfView = 60;
+                        mainCardBattleHandler.StartCardBattle(); // Start a card battle
                         break;
-                }
+                    case 2: // player lost
+                            // insert dialogue to talk about the loss
+                        oysterCharacter.SetConversationName("AlyxRoomPlayerLose");
+                        oysterCaller.CallScript(oysterCharacter);
+                        break;
+                    case 3: // player won
+                            // insert dialogue to finish off scene
+                        oysterCharacter.SetConversationName("AlyxRoomPlayerWin");
+                        oysterCaller.CallScript(oysterCharacter);
+                        break;
+                    }
+                //}
                 break;
             case "EmilyRoom": // If the location is EmilyRoom
                 break; // Do nothing
         }
+        sceneJustLoaded = false;
     }
 }

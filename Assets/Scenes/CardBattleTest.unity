@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
+  m_IndirectSpecularColor: {r: 0.18028352, g: 0.22571376, b: 0.3069224, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -203,6 +203,7 @@ MonoBehaviour:
     cards: []
   currency: 0
   ready: 0
+  type: 
   mainScript: {fileID: 1072616410}
   boardObject: {fileID: 1449541925}
 --- !u!1 &268290577
@@ -405,6 +406,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a0d6d5a0442138843a1cf3957f084f51, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1 &643766009 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3743527567230630677, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
+  m_PrefabInstance: {fileID: 1554071027}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &643766012 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 272992034601389312, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
+  m_PrefabInstance: {fileID: 1554071027}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 643766009}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d38456fe4fcfee45bf192a71c093098, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &656949191
 GameObject:
   m_ObjectHideFlags: 0
@@ -498,6 +515,16 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!224 &780934868 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 552171083166931281, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+  m_PrefabInstance: {fileID: 552171082543299273}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &841168950 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4331964591454457023, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+  m_PrefabInstance: {fileID: 552171082543299273}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1072616409
 GameObject:
   m_ObjectHideFlags: 0
@@ -528,15 +555,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c08b32d8a03c6bc40b821bc095b1a524, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  profileHandler: {fileID: 0}
   sceneStateLoader: {fileID: 0}
   cardBattleHUD: {fileID: 272550940}
+  gameEndPrompt: {fileID: 841168950}
+  HUD: {fileID: 780934868}
   cardPrefab: {fileID: 8642576583363572454, guid: 9653e68efee458b44a25bdac97382577, type: 3}
   boardPrefab: {fileID: 6586170444004513768, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
   cardInfoPrefab: {fileID: 4642425625139935134, guid: d2d0e55af676b0347aac437484c96488, type: 3}
   enemy: {fileID: 173490911}
   board: {fileID: 1449541925}
   bellScript: {fileID: 389402389}
+  bellSprite: {fileID: 21300000, guid: cb8c538c8da055e47822020cd7112085, type: 3}
   phischScript: {fileID: 562039074}
+  phischPileSprite: {fileID: 21300000, guid: b3ad62c1cb08cfb4aaf3c0318d46fe24, type: 3}
+  playerDeckPile: {fileID: 643766009}
+  playerDeckPileScript: {fileID: 643766012}
+  deckPileSprite: {fileID: 21300000, guid: 00afea0f351d4b7458f11c72807812fe, type: 3}
+  defaultCardMaterial: {fileID: 2100000, guid: baac9a975b3409646814b2c647f03b0a, type: 2}
   cardMaterials:
   - {fileID: 2100000, guid: ca3703f3fca756047a7a9e8be8bacefe, type: 2}
   - {fileID: 2100000, guid: baac9a975b3409646814b2c647f03b0a, type: 2}
@@ -595,6 +631,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: Board
       objectReference: {fileID: 0}
+    - target: {fileID: 7593100014713985561, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
+      propertyPath: m_Size.x
+      value: 0.145604
+      objectReference: {fileID: 0}
+    - target: {fileID: 7593100014713985561, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
+      propertyPath: m_Center.x
+      value: 0.005621843
+      objectReference: {fileID: 0}
     - target: {fileID: 7985336260596275425, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
       propertyPath: m_RootOrder
       value: 1
@@ -639,7 +683,9 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 5197442971243875717, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
+    - {fileID: 1700493244938589915, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
   m_SourcePrefab: {fileID: 100100000, guid: 4281a2d3b44660f40a0ce0d87550c945, type: 3}
 --- !u!1 &1988727701
 GameObject:
@@ -809,6 +855,38 @@ PrefabInstance:
     - target: {fileID: 552171083166931293, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
       propertyPath: m_Name
       value: HUD
+      objectReference: {fileID: 0}
+    - target: {fileID: 884189418946083710, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: globalEventHandler
+      value: 
+      objectReference: {fileID: 1072616409}
+    - target: {fileID: 4331964592979649020, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4331964592979649020, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4331964592979649020, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
+      value: 
+      objectReference: {fileID: 1072616410}
+    - target: {fileID: 4331964592979649020, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4331964592979649020, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
+      value: ContinueClicked
+      objectReference: {fileID: 0}
+    - target: {fileID: 4331964592979649020, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: MainCardBattleHandler, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 4331964592979649020, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
+      value: UnityEngine.Object, UnityEngine
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ebcc9477ec31bab4095fc3c0ea83f391, type: 3}

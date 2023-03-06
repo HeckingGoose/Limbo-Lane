@@ -15,6 +15,10 @@ public class EnemyScript : MonoBehaviour
     public int currency;
     [HideInInspector] // Setup variables that mainScript can see for handling card battle
     public bool ready = false;
+    [HideInInspector]
+    public string type;
+    [HideInInspector]
+    public (int, string, string)[] rewards;
     #endregion
     [SerializeField]
     private MainCardBattleHandler mainScript;
@@ -43,6 +47,12 @@ public class EnemyScript : MonoBehaviour
                 deck = new Deck();
                 deck.cards = new Card[handSize];
                 fullDeck.cards = new Card[10];
+                type = "boss";
+                rewards = new (int, string, string)[2] 
+                {
+                    (1, "Reaper", "Card"),
+                    (4, "Soul Stuff", "Currency")
+                }; 
                 fullDeck.cards[0] = mainScript.CreateCardData("Reaper");
                 fullDeck.cards[1] = mainScript.CreateCardData("Reaper");
                 fullDeck.cards[2] = mainScript.CreateCardData("Reaper");
@@ -57,13 +67,19 @@ public class EnemyScript : MonoBehaviour
                 GenerateDeck();
                 break;
             case "alyx": // If enemy name is alyx
-                currency = 5;
-                health = 4;
+                currency = 40;
+                health = 15;
                 handSize = 5;
                 fullDeck = new Deck();
                 deck = new Deck();
                 deck.cards = new Card[handSize];
-                fullDeck.cards = new Card[7];
+                fullDeck.cards = new Card[15];
+                type = "boss";
+                rewards = new (int, string, string)[2]
+                {
+                    (1, "Reaper", "Card"),
+                    (4, "Soul Stuff", "Currency")
+                };
                 fullDeck.cards[0] = mainScript.CreateCardData("Reaper");
                 fullDeck.cards[1] = mainScript.CreateCardData("Reaper"); // Do same as above but with values tailored to this character
                 fullDeck.cards[2] = mainScript.CreateCardData("Reaper");
@@ -71,6 +87,14 @@ public class EnemyScript : MonoBehaviour
                 fullDeck.cards[4] = mainScript.CreateCardData("Reaper");
                 fullDeck.cards[5] = mainScript.CreateCardData("Rock");
                 fullDeck.cards[6] = mainScript.CreateCardData("Rock");
+                fullDeck.cards[7] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[8] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[9] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[10] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[11] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[12] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[13] = mainScript.CreateCardData("Reaper");
+                fullDeck.cards[14] = mainScript.CreateCardData("Reaper");
                 break;
         }
         maxHealth = health; // Set maxHealth equal to health
@@ -244,7 +268,7 @@ public class EnemyScript : MonoBehaviour
     }
     private void PlaceCardOnBoard(GameObject card, int boardx, int boardy, GameObject[ , ] boardArray)
     {
-        int row = 0; // Set row to 0
+        int row = 0;
         GameObject frontRow = boardObject.transform.Find("Opponent").Find("FrontRow").gameObject;
         GameObject backRow = boardObject.transform.Find("Opponent").Find("BackRow").gameObject; // Cache the front and back row
         for (int i = 0; i < boardArray.Length; i++) // Loop through every index in board array

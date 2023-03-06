@@ -12,15 +12,25 @@ public class ProfileHandler : MonoBehaviour
     [SerializeField]
     private MainMenuHandler mainMenuHandler;
     private string documentsPath; // Define variables
+    [HideInInspector]
     public bool checksDone = false;
+    [HideInInspector]
     public int linesPerFrame = 5;
+    [HideInInspector]
     public string windowedMode;
+    [HideInInspector]
     public bool vsync;
+    [HideInInspector]
     public int maxTextureSize;
+    [HideInInspector]
     public int resWidth;
+    [HideInInspector]
     public int resHeight;
+    [HideInInspector]
     public int refreshRate;
+    [HideInInspector]
     public float renderScale;
+    [HideInInspector]
     private void Start()
     {
         DoChecks(); // Do required checks
@@ -47,6 +57,29 @@ public class ProfileHandler : MonoBehaviour
             }
         }
     }
+    public void SaveGame(ProfileData profileData)
+    {
+        try
+        {
+            File.WriteAllText(documentsPath + @"\My Games\LimboLane\Profiles\" + profileData.name + ".json", JsonUtility.ToJson(profileData));
+        }
+        catch
+        {
+            Debug.LogError("Failed to save profile!");
+        }
+    }
+    public ProfileData FetchProfileData(string profileName)
+    {
+        return JsonUtility.FromJson<ProfileData>(File.ReadAllText(documentsPath + @"\My Games\LimboLane\Profiles\" + profileName + ".json"));
+    }
+    public Options FetchOptions()
+    {
+        return JsonUtility.FromJson<Options>(File.ReadAllText(documentsPath + @"\My Games\LimboLane\options.json"));
+    }
+    public string FetchDocumentsPath()
+    {
+        return System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments);
+    }
     public void LoadGame(string profileName)
     {
         // Add Try statement to catch when file does not exist (even though file should always exist based on how this is entered)
@@ -60,7 +93,14 @@ public class ProfileHandler : MonoBehaviour
                 break;
             case "AlexHouse":
                 // load and run tutorial from AlexHouse
-                mainMenuHandler.ForceNewGame();
+                try
+                {
+                    mainMenuHandler.ForceNewGame();
+                }
+                catch
+                {
+                    Debug.LogError("Missing reference to mainMenuHandler.cs!");
+                }
                 break;
             case "AlyxRoom":
                 // load and run game from AlyxHouse
@@ -71,7 +111,6 @@ public class ProfileHandler : MonoBehaviour
     }
     public void SaveOptions(Options options)
     {
-        
         File.WriteAllText(documentsPath + @"\My Games\LimboLane\options.json", JsonUtility.ToJson(options)); // Write options to options file
     }
     public void LoadOptions()
@@ -167,7 +206,7 @@ public class ProfileHandler : MonoBehaviour
         LoadOptions(); // Load options from options file
         checksDone = true; // Set checks done to true
     }
-    private void SetupPersistentVariables(ProfileData profileData, Options options, string documentsPath)
+    public void SetupPersistentVariables(ProfileData profileData, Options options, string documentsPath)
     {
         PersistentVariables.profileName = profileData.name;
         PersistentVariables.profileVersion = profileData.version;
@@ -175,6 +214,8 @@ public class ProfileHandler : MonoBehaviour
         PersistentVariables.matchStartingHealth = profileData.matchStartingHealth;
         PersistentVariables.matchStartingCurrency = profileData.matchStartingCurrency; // This method is called when a game is made or loaded
         PersistentVariables.profileLocation = profileData.location;
+        PersistentVariables.profileLevel = profileData.level;
+        PersistentVariables.profileXp = profileData.xp;
         PersistentVariables.handSize = profileData.handSize;
         PersistentVariables.charactersPerSecond = options.charactersPerSecond;
         PersistentVariables.linesPerFrame = options.linesPerFrame;
@@ -187,8 +228,10 @@ public class ProfileHandler : MonoBehaviour
         profile.name = profileName;
         profile.version = "1.0";
         profile.location = "AlexHouse";
+        profile.level = 1;
+        profile.xp = 0;
         profile.currency = 0;
-        profile.matchStartingHealth = 7;
+        profile.matchStartingHealth = 3;
         profile.matchStartingCurrency = 3;
         profile.deck = new string[4]; // Defines a bunch of default values for a profile and then returns the created profile
         profile.deck[0] = "Reaper";

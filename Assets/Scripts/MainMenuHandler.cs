@@ -78,6 +78,8 @@ public class MainMenuHandler : MonoBehaviour
     private GameObject HUD;
     [SerializeField]
     private ProfileHandler profileHandler;
+    [SerializeField]
+    private MidGameMenuHandler midGameMenuHandler;
     private GameObject blocker;
     #endregion
     void Start() // On script start
@@ -88,6 +90,7 @@ public class MainMenuHandler : MonoBehaviour
         foreach (Resolution resolution in resolutions)
         {
             temp.Add(null);
+            temp.Add(null);
         }
         resolutionsDropdown.AddOptions(temp);
         resHeight = profileHandler.resHeight;
@@ -97,12 +100,17 @@ public class MainMenuHandler : MonoBehaviour
         renderScaleSlider.value = profileHandler.renderScale;
         renderPipelineAsset.renderScale = renderScale;
         renderScaleText.text = Convert.ToInt32(renderScale * 100).ToString() + "%";
-        for (int i = 0; i < resolutions.Length; i++)
+        for (int i = 0; i < resolutions.Length * 2; i += 2)
         {
-            resolutionsDropdown.options[i].text = resolutions[i].width.ToString() + " x " + resolutions[i].height.ToString() + " @ " + resolutions[i].refreshRate;
-            if (resolutions[i].width == resWidth && resolutions[i].height == resHeight && resolutions[i].refreshRate == refreshRate)
+            resolutionsDropdown.options[i].text = resolutions[i / 2].width.ToString() + " x " + resolutions[i / 2].height.ToString() + " @ " + resolutions[i / 2].refreshRate;
+            resolutionsDropdown.options[i + 1].text = resolutions[i / 2].height.ToString() + " x " + resolutions[i / 2].width.ToString() + " @ " + resolutions[i / 2].refreshRate;
+            if (resolutions[i / 2].width == resWidth && resolutions[i / 2].height == resHeight && resolutions[i / 2].refreshRate == refreshRate)
             {
                 resolutionsDropdown.value = i;
+            }
+            else if (resolutions[i / 2].width == resHeight && resolutions[i / 2].height == resWidth && resolutions[i / 2].refreshRate == refreshRate)
+            {
+                resolutionsDropdown.value = i + 1;
             }
         }
         windowMode = profileHandler.windowedMode;
@@ -162,6 +170,14 @@ public class MainMenuHandler : MonoBehaviour
         newGameState = 2;
         NewGame();
     }
+    public void CancelNewGame()
+    {
+        GameObject.Destroy(blocker); // Destroy the blocker and set the newGamePrompt to be hidden
+        blocker = null;
+        newGameState = 0;
+        newGameInput.text = "";
+        newGamePrompt.SetActive(false);
+    }
     public void NewGame()
     {
         switch (newGameState)
@@ -205,15 +221,9 @@ public class MainMenuHandler : MonoBehaviour
                 mainMenu.SetActive(false);
                 initialiseScript.CallScript(script);
                 newGameState = 0;
+                midGameMenuHandler.disabled = false;
                 break;
         }
-    }
-    public void CancelNewGame()
-    {
-        GameObject.Destroy(blocker); // Destroy the blocker and set the newGamePrompt to be hidden
-        blocker = null;
-        newGamePrompt.SetActive(false);
-        newGameState = 0;
     }
     public void CancelLoadGame()
     {
@@ -238,6 +248,7 @@ public class MainMenuHandler : MonoBehaviour
                 loadGameState = 0;
                 loadGamePrompt.SetActive(false);
                 profileHandler.LoadGame(loadGameDropdown.options[loadGameDropdown.value].text);
+                midGameMenuHandler.disabled = false;
                 break;
         }
     }
@@ -269,25 +280,104 @@ public class MainMenuHandler : MonoBehaviour
     */
     public void SwitchResolution()
     {
-        int i = resolutionsDropdown.value;
-        Resolution[] resolutions = Screen.resolutions;
-        resWidth = resolutions[i].width;
-        resHeight = resolutions[i].height;
-        refreshRate = resolutions[i].refreshRate;
-        switch (profileHandler.windowedMode.ToLower())
+        string tempString = resolutionsDropdown.options[resolutionsDropdown.value].text;
+        string resolutionString = "";
+        foreach (Char chr in tempString)
         {
-            default:
-                Debug.Log("Window mode not recognised.");
-                break;
-            case "borderless window":
-                Screen.SetResolution(resolutions[i].width, resolutions[i].height, FullScreenMode.FullScreenWindow, resolutions[i].refreshRate);
-                break;
-            case "exclusive fullscreen":
-                Screen.SetResolution(resolutions[i].width, resolutions[i].height, FullScreenMode.ExclusiveFullScreen, resolutions[i].refreshRate);
-                break;
-            case "windowed":
-                Screen.SetResolution(resolutions[i].width, resolutions[i].height, FullScreenMode.Windowed, resolutions[i].refreshRate);
-                break;
+            if (chr != ' ')
+            {
+                resolutionString += chr;
+            }
+        }
+        Vector2 resolution = new Vector2();
+        int refreshRate = 0;
+        int state = 0;
+        string temp = "";
+        bool failed = false;
+        for (int i = 0; i < resolutionString.Length; i++)
+        {
+            switch (state)
+            {
+                default:
+                    Debug.Log("State " + state + " not recognised.");
+                    break;
+                case 0: // reading width
+                    if (resolutionString[i] == 'x')
+                    {
+                        //i++;
+                        state++;
+                        try
+                        {
+                            resolution.x = Convert.ToInt32(temp);
+                        }
+                        catch
+                        {
+                            Debug.Log("Something went wrong! (" + temp + ")");
+                            failed = true;
+                        }
+                        temp = "";
+                    }
+                    else
+                    {
+                        temp += resolutionString[i];
+                    }
+                    break;
+                case 1: // reading height
+                    if (resolutionString[i] == '@')
+                    {
+                       // i++;
+                        state++;
+                        try
+                        {
+                            resolution.y = Convert.ToInt32(temp);
+                        }
+                        catch
+                        {
+                            Debug.Log("Something went wrong! (" + temp + ")");
+                            failed = true;
+                        }
+                        temp = "";
+                    }
+                    else
+                    {
+                        temp += resolutionString[i];
+                    }
+                    break;
+                case 2: // reading refresh rate
+                    temp += resolutionString[i];
+                    break;
+            }
+        }
+        try
+        {
+            refreshRate = Convert.ToInt32(temp);
+        }
+        catch
+        {
+            Debug.Log("Something went wrong! (" + temp + ")");
+            failed = true;
+        }
+        temp = "";
+        if (!failed)
+        {
+            switch (profileHandler.windowedMode.ToLower())
+            {
+                default:
+                    Debug.Log("Window mode not recognised.");
+                    break;
+                case "borderless window":
+                    Screen.SetResolution(Convert.ToInt32(resolution.x), Convert.ToInt32(resolution.y), FullScreenMode.FullScreenWindow, refreshRate);
+                    break;
+                case "exclusive fullscreen":
+                    Screen.SetResolution(Convert.ToInt32(resolution.x), Convert.ToInt32(resolution.y), FullScreenMode.ExclusiveFullScreen, refreshRate);
+                    break;
+                case "windowed":
+                    Screen.SetResolution(Convert.ToInt32(resolution.x), Convert.ToInt32(resolution.y), FullScreenMode.Windowed, refreshRate);
+                    break;
+            }
+            resWidth = Convert.ToInt32(resolution.x);
+            resHeight = Convert.ToInt32(resolution.y);
+            refreshRate = Convert.ToInt32(refreshRate);
         }
     }
     public void SwitchMaxTextureSize()
@@ -322,6 +412,7 @@ public class MainMenuHandler : MonoBehaviour
                 windowMode = "Windowed"; // Store a string referencing the current window mode
                 break;
         }
+        profileHandler.windowedMode = windowMode;
     }
     public void SwitchVsync()
     {

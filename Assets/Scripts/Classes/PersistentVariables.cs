@@ -9,6 +9,8 @@ public class PersistentVariables // Tell Unity that this is a class
     public static int matchStartingHealth = -1;
     public static int matchStartingCurrency = -1;
     public static string profileLocation = "";
+    public static int profileLevel = -1;
+    public static int profileXp = -1;
     public static int handSize = -1;
     // Any non-built in objects, such as Deck cannot be referenced like this
     #endregion
