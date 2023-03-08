@@ -14,46 +14,46 @@ public class PulseSpriteSize : MonoBehaviour
     private Vector3 finalScale;
     private void Start()
     {
-        if (maxScale < 1)
+        if (maxScale < 1) // Limit maxScale to be 1
         {
             maxScale = 1;
         }
-        ogScale = this.transform.localScale;
-        finalScale = this.transform.localScale * maxScale;
-        state = "increasing";
+        ogScale = this.transform.localScale; // Cache the original sprite size
+        finalScale = this.transform.localScale * maxScale; // Calculate and store the max sprite size
+        state = "increasing"; // Set the state to increasing
     }
     private void Update()
     {
-        switch (state)
+        switch (state) // Pick which state the function is currently in
         {
-            default:
-                Debug.Log("State not recognised! (" + state + ")");
+            default: // State not recognised
+                Debug.Log("State not recognised! (" + state + ")"); // Inform the Unity console that something went wrong
                 break;
-            case "increasing":
-                if (currentTime < timePeriod)
+            case "increasing": // If the state is increasing
+                if (currentTime < timePeriod) // If it is not time to switch state
                 {
-                    this.transform.localScale = Vector3.Lerp(ogScale, finalScale, currentTime / timePeriod);
+                    this.transform.localScale = Vector3.Lerp(ogScale, finalScale, currentTime / timePeriod); // Interpolate between og and final scale
                 }
-                else
+                else // Otherwiwse
                 {
-                    this.transform.localScale = finalScale;
-                    state = "decreasing";
-                    currentTime = 0;
+                    this.transform.localScale = finalScale; // Set scale to final scale
+                    state = "decreasing"; // Set state to decreasing
+                    currentTime = 0; // Reset time
                 }
                 break;
-            case "decreasing":
-                if (currentTime < timePeriod)
+            case "decreasing": // If the state is decreasing
+                if (currentTime < timePeriod) // If it is not time to switch state
                 {
-                    this.transform.localScale = Vector3.Lerp(finalScale, ogScale, currentTime / timePeriod);
+                    this.transform.localScale = Vector3.Lerp(finalScale, ogScale, currentTime / timePeriod); // Interpolate between final and og scale
                 }
-                else
+                else // Otherwise
                 {
-                    this.transform.localScale = ogScale;
-                    state = "increasing";
-                    currentTime = 0;
+                    this.transform.localScale = ogScale; // Set scale to og scale
+                    state = "increasing"; // Set state to increasing
+                    currentTime = 0; // Reset time
                 }
                 break;
         }
-        currentTime += Time.deltaTime;
+        currentTime += Time.deltaTime; // Increment time
     } 
 }

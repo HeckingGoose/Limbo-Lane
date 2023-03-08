@@ -750,93 +750,93 @@ public class MainCardBattleHandler : MonoBehaviour
                     if (gameEndFirstLoop)
                     {
                         #region Calculate Xp gain
-                        float multiplier = -1;
-                        switch (enemy.type)
+                        float multiplier = -1; // Set erroneous multiplier value
+                        switch (enemy.type) // Pick which type the enemy is
                         {
                             default: // basic enemy
-                                multiplier = 1;
+                                multiplier = 1; // Set multiplier to 1
                                 break;
-                            case "boss":
-                                multiplier = 2;
+                            case "boss": // boss enemy
+                                multiplier = 2; // Set multiplier to 2
                                 break;
                         }
-                        int xpGain = Convert.ToInt32((levelXp / 10) * multiplier + 1);
+                        int xpGain = Convert.ToInt32((levelXp / 10) * multiplier + 1); // Calcualte the XP gain as 1/10 of the x to the next level multiplied by the multiplier, and then 1 is added on
                         #endregion
-                        (int, string, string)[] rewards = new (int, string, string)[enemy.rewards.Length + 1];
-                        rewards[0] = (xpGain, "XP", "XP");
-                        for (int i = 0; i < enemy.rewards.Length; i++)
+                        (int, string, string)[] rewards = new (int, string, string)[enemy.rewards.Length + 1]; // Set the rewards as a new array of length enemy rewards + 1
+                        rewards[0] = (xpGain, "XP", "XP"); // Add the xp gain as the first reward
+                        for (int i = 0; i < enemy.rewards.Length; i++) // Loop through every enemy reward
                         {
-                            rewards[i + 1] = enemy.rewards[i];
+                            rewards[i + 1] = enemy.rewards[i]; // Add the reward to the current index + 1 of rewards
                         }
                         xp += xpGain; // Handle leveling up here
                         #region Handle showing the prompt
                         gameEndPrompt.SetActive(true);
-                        gameEndFirstLoop = false;
+                        gameEndFirstLoop = false; // Call a set of functions to handle setting previously calculated values to be shown on screen
                         gameEndPromptScript.SetWinText(true);
                         gameEndPromptScript.SetRewards(rewards);
                         gameEndPromptScript.SetXpBar(xp, levelXp);
                         continueClicked = false;
                         #endregion
                         #region Update player profile
-                        if (profileHandler != null && PersistentVariables.profileName != "")
+                        if (profileHandler != null && PersistentVariables.profileName != "") // If there is a profile handler and a profile is loaded
                         {
-                            ProfileData saveGame = profileHandler.FetchProfileData(PersistentVariables.profileName);
-                            saveGame.level = level;
-                            for (int i = 0; i < saveGame.locationStates.Length; i++)
+                            ProfileData saveGame = profileHandler.FetchProfileData(PersistentVariables.profileName); // Load the current profile
+                            saveGame.level = level; // Set the player's level equal to their new level
+                            for (int i = 0; i < saveGame.locationStates.Length; i++) // Loop through every location in the profile
                             {
-                                if (saveGame.locationStates[i].name == saveGame.location)
+                                if (saveGame.locationStates[i].name == saveGame.location) // If the location matches the current location
                                 {
-                                    saveGame.locationStates[i].state += bumpStateBy;
+                                    saveGame.locationStates[i].state += bumpStateBy; // bumpt the state by a previously set amount
                                 }
                             }
-                            foreach ((int, string, string) reward in rewards)
+                            foreach ((int, string, string) reward in rewards) // Loop through every reward
                             {
-                                switch (reward.Item3.ToLower())
+                                switch (reward.Item3.ToLower()) // Pick based on the reward type what to do
                                 {
-                                    default:
+                                    default: // Reward not recognised, inform Unity console that something went wrong
                                         Debug.LogWarning("Reward not recognised! (Amount: " + reward.Item1 +", Name: " + reward.Item2 + ", Type: " + reward.Item3 + ")");
                                         break;
-                                    case "card":
-                                        string[] temp = saveGame.deck;
-                                        saveGame.deck = new string[temp.Length + reward.Item1];
-                                        for (int i = 0; i < saveGame.deck.Length; i++)
+                                    case "card": // If the reward is a card
+                                        string[] temp = saveGame.deck; // Cache the player's deck in temp
+                                        saveGame.deck = new string[temp.Length + reward.Item1]; // Reset the player's deck to an array of size temp + 1
+                                        for (int i = 0; i < saveGame.deck.Length; i++) // Iterate through every index of the player's deck
                                         {
-                                            if (i < temp.Length)
+                                            if (i < temp.Length) // If the index does not exceed the length of temp
                                             {
-                                                saveGame.deck[i] = temp[i];
+                                                saveGame.deck[i] = temp[i]; // Add the card stored in temp at this current index to the player's deck
                                             }
-                                            else
+                                            else // Otherwise
                                             {
-                                                saveGame.deck[i] = reward.Item2;
+                                                saveGame.deck[i] = reward.Item2; // Add the reward to the player's deck
                                             }
                                         }
                                         break;
-                                    case "currency":
-                                        saveGame.currency += reward.Item1;
+                                    case "currency": // If the reward is currency
+                                        saveGame.currency += reward.Item1; // Directly add the currency to the player's currency
                                         break;
-                                    case "xp":
-                                        saveGame.xp += reward.Item1;
+                                    case "xp": // If the reward is currency
+                                        saveGame.xp += reward.Item1; // Directly add the xp to the player's currency
                                         break;
                                 }
                             }
-                            profileHandler.SaveGame(saveGame);
-                            profileHandler.SetupPersistentVariables(saveGame, profileHandler.FetchOptions(), profileHandler.FetchDocumentsPath());
+                            profileHandler.SaveGame(saveGame); // Save the changes made to the profile
+                            profileHandler.SetupPersistentVariables(saveGame, profileHandler.FetchOptions(), profileHandler.FetchDocumentsPath()); // Redo persistant variables so that they respect the recently made changes to profile data
                         }
-                        else
+                        else // Otherwise
                         {
-                            Debug.LogWarning("Missing reference to profileHandler.cs! Skipping updating profile.");
+                            Debug.LogWarning("Missing reference to profileHandler.cs! Skipping updating profile."); // Inform the Unity console that something has gone wrong
                         }
                         #endregion
                     }
-                    if (continueClicked)
+                    if (continueClicked) // If the continue button is clicked
                     {
                         gameEndPrompt.SetActive(false);
-                        currentTurn = "EndGame";
+                        currentTurn = "EndGame"; // Reset the prompt and switch the turn to the EndGame turn
                         gameEndFirstLoop = true;
                     }
                     #endregion
                     break;
-                case "enemywin":
+                case "enemywin": // This part functions identically to the above part with minor variable name changes to reference graphics and text for losing instead
                     #region Show enemy winning screen
                     if (gameEndFirstLoop)
                     {
@@ -979,9 +979,9 @@ public class MainCardBattleHandler : MonoBehaviour
             }
         }
     }
-    public void ContinueClicked()
+    public void ContinueClicked() // Called when the continue button on the end game prompt is clicked
     {
-        continueClicked = true;
+        continueClicked = true; // Set continue clicked to true
     }
     private GameObject CreatePrompt(string name, Sprite image, Vector2 size, Vector2 position, Transform parent)
     {
