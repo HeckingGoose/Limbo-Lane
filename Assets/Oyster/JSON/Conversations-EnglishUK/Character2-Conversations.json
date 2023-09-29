@@ -197,7 +197,7 @@
         "AddSmoothText; '...'; CharacterSpeechTextBox; clickToSkip = true",
         "WaitForInput",
         "ModifyTextBox; CharacterSpeechTextBox; text = ",
-        "AddSmoothText; 'I guess it doesn`t that doesn`t matter too much anyway. Soooooo, you ready to start cleaning?'; CharacterSpeechTextBox; clickToSkip = true",
+        "AddSmoothText; 'I guess that doesn`t matter too much anyway. Soooooo, you ready to start cleaning?'; CharacterSpeechTextBox; clickToSkip = true",
         "WaitForInput",
         "ModifyTextBox; CharacterNameTextBox; text = Alex; colourFromCharacter = Alex",
         "ModifyTextBox; CharacterSpeechTextBox; text = ",
